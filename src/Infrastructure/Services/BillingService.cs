@@ -70,7 +70,7 @@ public sealed class BillingService : IBillingService
 
         await _db.SaveChangesAsync(ct);
 
-        await RecomputeInvoiceAsync(inv.JobCardId, ct);
+        await RecomputeInvoiceAsync(inv.JobCardId, actorUserId, ct);
 
         return new PaymentResponse(pay.Id, pay.InvoiceId, pay.Amount, pay.Method, pay.PaidAt, pay.ReceivedByUserId, pay.Notes);
     }
@@ -111,7 +111,7 @@ public sealed class BillingService : IBillingService
         _db.JobLineItems.Add(line);
         await _db.SaveChangesAsync(ct);
 
-        await RecomputeInvoiceAsync(jobCardId, ct);
+        await RecomputeInvoiceAsync(jobCardId, actorUserId, ct);
 
         return MapLine(line);
     }
@@ -137,10 +137,10 @@ public sealed class BillingService : IBillingService
         line.IsDeleted = true;
         await _db.SaveChangesAsync(ct);
 
-        await RecomputeInvoiceAsync(line.JobCardId, ct);
+        await RecomputeInvoiceAsync(line.JobCardId, actorUserId, ct);
     }
 
-    private async Task RecomputeInvoiceAsync(Guid jobCardId, CancellationToken ct)
+    private async Task RecomputeInvoiceAsync(Guid jobCardId, Guid actorUserId, CancellationToken ct)
     {
         var inv = await _db.Invoices.Include(x => x.JobCard).FirstOrDefaultAsync(x => x.JobCardId == jobCardId && !x.IsDeleted, ct);
         if (inv is null) return;
@@ -155,9 +155,22 @@ public sealed class BillingService : IBillingService
         else if (totalPaid < inv.Total) inv.PaymentStatus = PaymentStatus.PartiallyPaid;
         else inv.PaymentStatus = PaymentStatus.Paid;
 
-        if (inv.PaymentStatus == PaymentStatus.Paid && inv.JobCard != null)
+        if (inv.PaymentStatus == PaymentStatus.Paid && inv.JobCard != null && inv.JobCard.Status != JobCardStatus.Pagado)
         {
+            var oldStatus = inv.JobCard.Status;
             inv.JobCard.Status = JobCardStatus.Pagado;
+
+            _db.AuditLogs.Add(new Domain.Entities.AuditLog
+            {
+                BranchId = inv.JobCard.BranchId,
+                Action = "JOB_CARD_STATUS_CHANGE",
+                EntityType = "JobCard",
+                EntityId = inv.JobCard.Id,
+                OldValue = oldStatus.ToString(),
+                NewValue = $"{JobCardStatus.Pagado} (Auto from Billing)",
+                PerformedByUserId = actorUserId,
+                PerformedAt = DateTimeOffset.UtcNow
+            });
         }
 
         await _db.SaveChangesAsync(ct);

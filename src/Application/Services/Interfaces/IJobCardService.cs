@@ -12,6 +12,6 @@ public interface IJobCardService
 
     Task<JobCardResponse> CheckInAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default);
     Task<JobCardResponse> CheckOutAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default);
-    Task<JobCardResponse> ChangeStatusAsync(Guid actorUserId, Guid branchId, Guid id, JobCardStatus status, CancellationToken ct = default);
+    Task<JobCardResponse> ChangeStatusAsync(Guid actorUserId, Guid branchId, Guid id, JobCardStatus status, string? note = null, CancellationToken ct = default);
     Task<JobCardResponse> UpdateDiagnosisAsync(Guid actorUserId, Guid branchId, Guid id, string? diagnosis, CancellationToken ct = default);
 }
