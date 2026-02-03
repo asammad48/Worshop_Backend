@@ -30,6 +30,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
     public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
     public DbSet<JobCardPartUsage> JobCardPartUsages => Set<JobCardPartUsage>();
+    public DbSet<JobLineItem> JobLineItems => Set<JobLineItem>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<EmployeeProfile> EmployeeProfiles => Set<EmployeeProfile>();
     public DbSet<WagePayment> WagePayments => Set<WagePayment>();
@@ -531,6 +532,26 @@ public sealed class AppDbContext : DbContext
             r.HasOne(x => x.OfficeSignedByUser).WithMany().HasForeignKey(x => x.OfficeSignedByUserId).OnDelete(DeleteBehavior.Restrict);
             r.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
             r.HasOne(x => x.PurchaseOrder).WithMany().HasForeignKey(x => x.PurchaseOrderId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<JobLineItem>(i =>
+        {
+            i.ToTable("job_line_items");
+            i.HasKey(x => x.Id);
+            Base(i);
+            i.Property(x => x.JobCardId).HasColumnName("jobcard_id").IsRequired();
+            i.Property(x => x.Type).HasColumnName("type").HasConversion<short>().IsRequired();
+            i.Property(x => x.Title).HasColumnName("title").IsRequired();
+            i.Property(x => x.Qty).HasColumnName("qty").HasColumnType("numeric(12,2)");
+            i.Property(x => x.UnitPrice).HasColumnName("unit_price").HasColumnType("numeric(12,2)");
+            i.Property(x => x.Total).HasColumnName("total").HasColumnType("numeric(12,2)");
+            i.Property(x => x.Notes).HasColumnName("notes");
+            i.Property(x => x.PartId).HasColumnName("part_id");
+            i.Property(x => x.JobPartRequestId).HasColumnName("job_part_request_id");
+
+            i.HasOne(x => x.JobCard).WithMany().HasForeignKey(x => x.JobCardId).OnDelete(DeleteBehavior.Cascade);
+            i.HasOne(x => x.Part).WithMany().HasForeignKey(x => x.PartId).OnDelete(DeleteBehavior.Restrict);
+            i.HasOne(x => x.JobPartRequest).WithMany().HasForeignKey(x => x.JobPartRequestId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

@@ -70,18 +70,7 @@ public sealed class BillingService : IBillingService
 
         await _db.SaveChangesAsync(ct);
 
-        // recompute payment status
-        var totalPaid = await _db.Payments.AsNoTracking().Where(x => x.InvoiceId == inv.Id && !x.IsDeleted).SumAsync(x => (decimal?)x.Amount, ct) ?? 0m;
-        if (totalPaid <= 0m) inv.PaymentStatus = PaymentStatus.Pending;
-        else if (totalPaid < inv.Total) inv.PaymentStatus = PaymentStatus.PartiallyPaid;
-        else inv.PaymentStatus = PaymentStatus.Paid;
-
-        if (inv.PaymentStatus == PaymentStatus.Paid)
-        {
-            inv.JobCard!.Status = JobCardStatus.Pagado;
-        }
-
-        await _db.SaveChangesAsync(ct);
+        await RecomputeInvoiceAsync(inv.JobCardId, ct);
 
         return new PaymentResponse(pay.Id, pay.InvoiceId, pay.Amount, pay.Method, pay.PaidAt, pay.ReceivedByUserId, pay.Notes);
     }
@@ -102,6 +91,81 @@ public sealed class BillingService : IBillingService
             .ToListAsync(ct);
     }
 
+    public async Task<JobLineItemResponse> AddLineItemAsync(Guid actorUserId, Guid branchId, Guid jobCardId, JobLineItemCreateRequest request, CancellationToken ct = default)
+    {
+        var job = await _db.JobCards.FirstOrDefaultAsync(x => x.Id == jobCardId && x.BranchId == branchId && !x.IsDeleted, ct);
+        if (job is null) throw new NotFoundException("Job card not found");
+
+        var line = new Domain.Entities.JobLineItem
+        {
+            JobCardId = jobCardId,
+            Type = request.Type,
+            Title = request.Title.Trim(),
+            Qty = request.Qty,
+            UnitPrice = request.UnitPrice,
+            Total = request.Qty * request.UnitPrice,
+            Notes = request.Notes?.Trim(),
+            PartId = request.PartId,
+            JobPartRequestId = request.JobPartRequestId
+        };
+        _db.JobLineItems.Add(line);
+        await _db.SaveChangesAsync(ct);
+
+        await RecomputeInvoiceAsync(jobCardId, ct);
+
+        return MapLine(line);
+    }
+
+    public async Task<IReadOnlyList<JobLineItemResponse>> ListLineItemsAsync(Guid branchId, Guid jobCardId, CancellationToken ct = default)
+    {
+        var jobExists = await _db.JobCards.AnyAsync(x => x.Id == jobCardId && x.BranchId == branchId && !x.IsDeleted, ct);
+        if (!jobExists) throw new NotFoundException("Job card not found");
+
+        return await _db.JobLineItems.AsNoTracking()
+            .Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+            .OrderBy(x => x.CreatedAt)
+            .Select(x => MapLine(x))
+            .ToListAsync(ct);
+    }
+
+    public async Task DeleteLineItemAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default)
+    {
+        var line = await _db.JobLineItems.Include(x => x.JobCard).FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        if (line is null) throw new NotFoundException("Line item not found");
+        if (line.JobCard?.BranchId != branchId) throw new ForbiddenException("Wrong branch");
+
+        line.IsDeleted = true;
+        await _db.SaveChangesAsync(ct);
+
+        await RecomputeInvoiceAsync(line.JobCardId, ct);
+    }
+
+    private async Task RecomputeInvoiceAsync(Guid jobCardId, CancellationToken ct)
+    {
+        var inv = await _db.Invoices.Include(x => x.JobCard).FirstOrDefaultAsync(x => x.JobCardId == jobCardId && !x.IsDeleted, ct);
+        if (inv is null) return;
+
+        var subtotal = await _db.JobLineItems.Where(x => x.JobCardId == jobCardId && !x.IsDeleted).SumAsync(x => x.Total, ct);
+        inv.Subtotal = subtotal;
+        inv.Total = Math.Max(0, inv.Subtotal - inv.Discount + inv.Tax);
+
+        // re-evaluate payment status
+        var totalPaid = await _db.Payments.AsNoTracking().Where(x => x.InvoiceId == inv.Id && !x.IsDeleted).SumAsync(x => x.Amount, ct);
+        if (totalPaid <= 0m) inv.PaymentStatus = PaymentStatus.Pending;
+        else if (totalPaid < inv.Total) inv.PaymentStatus = PaymentStatus.PartiallyPaid;
+        else inv.PaymentStatus = PaymentStatus.Paid;
+
+        if (inv.PaymentStatus == PaymentStatus.Paid && inv.JobCard != null)
+        {
+            inv.JobCard.Status = JobCardStatus.Pagado;
+        }
+
+        await _db.SaveChangesAsync(ct);
+    }
+
     private static InvoiceResponse Map(Domain.Entities.Invoice x) =>
         new(x.Id, x.JobCardId, x.Subtotal, x.Discount, x.Tax, x.Total, x.PaymentStatus);
+
+    private static JobLineItemResponse MapLine(Domain.Entities.JobLineItem x) =>
+        new(x.Id, x.JobCardId, x.Type, x.Title, x.Qty, x.UnitPrice, x.Total, x.Notes, x.PartId, x.JobPartRequestId);
 }
