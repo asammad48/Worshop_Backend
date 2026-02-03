@@ -23,6 +23,8 @@ public sealed class PurchaseOrderService : IPurchaseOrderService
         var supplierExists = await _db.Suppliers.AnyAsync(x => x.Id == r.SupplierId && !x.IsDeleted, ct);
         if (!supplierExists) throw new NotFoundException("Supplier not found");
 
+        await using var tx = await _db.Database.BeginTransactionAsync(ct);
+
         var orderNo = $"PO-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}";
         var po = new PurchaseOrder { BranchId = branchId, SupplierId = r.SupplierId, OrderNo = orderNo, Status = PurchaseOrderStatus.Draft, Notes = r.Notes?.Trim() };
         _db.PurchaseOrders.Add(po);
@@ -34,6 +36,25 @@ public sealed class PurchaseOrderService : IPurchaseOrderService
             _db.PurchaseOrderItems.Add(new PurchaseOrderItem { PurchaseOrderId = po.Id, PartId = it.PartId, Qty = it.Qty, UnitCost = it.UnitCost, ReceivedQty = 0m });
         }
         await _db.SaveChangesAsync(ct);
+
+        if (r.JobPartRequestIds != null && r.JobPartRequestIds.Any())
+        {
+            var requests = await _db.JobPartRequests
+                .Where(x => r.JobPartRequestIds.Contains(x.Id) && x.BranchId == branchId && !x.IsDeleted)
+                .ToListAsync(ct);
+
+            foreach (var req in requests)
+            {
+                req.PurchaseOrderId = po.Id;
+                req.SupplierId = po.SupplierId;
+                req.Status = JobPartRequestStatus.Ordered;
+                req.OrderedAt = DateTimeOffset.UtcNow;
+            }
+            await _db.SaveChangesAsync(ct);
+        }
+
+        await tx.CommitAsync(ct);
+
         return Map(po);
     }
 
@@ -94,6 +115,20 @@ public sealed class PurchaseOrderService : IPurchaseOrderService
         var allReceived = items.All(x => x.ReceivedQty >= x.Qty);
         po.Status = allReceived ? PurchaseOrderStatus.Received : PurchaseOrderStatus.PartiallyReceived;
         if (allReceived) po.ReceivedAt = DateTimeOffset.UtcNow;
+
+        // Auto-mark linked requests as Arrived
+        var linkedRequests = await _db.JobPartRequests
+            .Where(x => x.PurchaseOrderId == po.Id && x.Status == JobPartRequestStatus.Ordered && !x.IsDeleted)
+            .ToListAsync(ct);
+
+        foreach (var req in linkedRequests)
+        {
+            if (r.Items.Any(i => i.PartId == req.PartId))
+            {
+                req.Status = JobPartRequestStatus.Arrived;
+                req.ArrivedAt = DateTimeOffset.UtcNow;
+            }
+        }
 
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
