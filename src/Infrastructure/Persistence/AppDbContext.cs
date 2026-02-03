@@ -36,6 +36,7 @@ public DbSet<WagePayment> WagePayments => Set<WagePayment>();
 public DbSet<Attachment> Attachments => Set<Attachment>();
 public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 public DbSet<Roadblocker> Roadblockers => Set<Roadblocker>();
+public DbSet<JobTask> JobTasks => Set<JobTask>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -447,6 +448,25 @@ modelBuilder.Entity<Roadblocker>(r =>
     r.Property(x => x.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
     r.HasIndex(x => x.JobCardId).HasDatabaseName("ix_roadblockers_jobcard");
 });
+
+    modelBuilder.Entity<JobTask>(t =>
+    {
+        t.ToTable("job_tasks");
+        t.HasKey(x => x.Id);
+        Base(t);
+        t.Property(x => x.JobCardId).HasColumnName("job_card_id").IsRequired();
+        t.Property(x => x.StationCode).HasColumnName("station_code").IsRequired();
+        t.Property(x => x.Title).HasColumnName("title").IsRequired();
+        t.Property(x => x.StartedAt).HasColumnName("started_at");
+        t.Property(x => x.EndedAt).HasColumnName("ended_at");
+        t.Property(x => x.StartedByUserId).HasColumnName("started_by_user_id");
+        t.Property(x => x.EndedByUserId).HasColumnName("ended_by_user_id");
+        t.Property(x => x.TotalMinutes).HasColumnName("total_minutes").HasDefaultValue(0);
+        t.Property(x => x.Notes).HasColumnName("notes");
+        t.Property(x => x.Status).HasColumnName("status").HasConversion<short>().IsRequired();
+        t.HasIndex(x => x.JobCardId).HasDatabaseName("ix_job_tasks_jobcard");
+        t.HasOne(x => x.JobCard).WithMany().HasForeignKey(x => x.JobCardId).OnDelete(DeleteBehavior.Cascade);
+    });
 
     }
 
