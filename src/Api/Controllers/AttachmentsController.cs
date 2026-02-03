@@ -29,4 +29,12 @@ public sealed class AttachmentsController : ControllerBase
         var branchId = User.GetBranchIdOrThrow();
         return ApiResponse<IReadOnlyList<AttachmentResponse>>.Ok(await _svc.ListAsync(branchId, ownerType, ownerId, ct));
     }
+
+    [HttpPost("presign")]
+    public async Task<ActionResult<ApiResponse<PresignResponse>>> Presign([FromBody] PresignRequest req, CancellationToken ct)
+    {
+        var branchId = User.GetBranchIdOrThrow();
+        var userId = User.GetUserId();
+        return ApiResponse<PresignResponse>.Ok(await _svc.PresignAsync(userId, branchId, req, ct));
+    }
 }

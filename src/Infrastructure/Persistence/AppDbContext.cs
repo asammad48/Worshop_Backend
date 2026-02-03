@@ -418,6 +418,7 @@ public sealed class AppDbContext : DbContext
             a.Property(x => x.ContentType).HasColumnName("content_type").IsRequired();
             a.Property(x => x.SizeBytes).HasColumnName("size_bytes").IsRequired();
             a.Property(x => x.StorageKey).HasColumnName("storage_key").IsRequired();
+            a.Property(x => x.Provider).HasColumnName("provider").HasConversion<short>().HasDefaultValue(StorageProvider.Local);
             a.Property(x => x.UploadedAt).HasColumnName("uploaded_at").HasDefaultValueSql("now()");
             a.Property(x => x.UploadedByUserId).HasColumnName("uploaded_by_user_id").IsRequired();
         });
