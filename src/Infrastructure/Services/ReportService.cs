@@ -33,8 +33,11 @@ public sealed class ReportService : IReportService
             .Select(g => new { Key = g.Key.ToString(), Count = g.Count() })
             .ToListAsync(ct);
 
+        var commsCount = await _db.CommunicationLogs.AsNoTracking()
+            .CountAsync(x => !x.IsDeleted && x.BranchId == branchId && x.SentAt >= from && x.SentAt <= to, ct);
+
         var dict = rb.ToDictionary(x => x.Key, x => x.Count);
-        return new SummaryReportResponse(expenses, wages, inShop, dict);
+        return new SummaryReportResponse(expenses, wages, inShop, dict, commsCount);
     }
 
     public async Task<IReadOnlyList<StuckVehicleResponse>> GetStuckVehiclesAsync(Guid branchId, CancellationToken ct = default)

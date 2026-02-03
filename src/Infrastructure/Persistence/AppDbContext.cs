@@ -38,6 +38,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Roadblocker> Roadblockers => Set<Roadblocker>();
     public DbSet<JobTask> JobTasks => Set<JobTask>();
     public DbSet<Approval> Approvals => Set<Approval>();
+    public DbSet<CommunicationLog> CommunicationLogs => Set<CommunicationLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -484,6 +485,23 @@ public sealed class AppDbContext : DbContext
             a.Property(x => x.Status).HasColumnName("status").HasConversion<short>().IsRequired();
             a.HasIndex(x => new { x.BranchId, x.TargetType, x.TargetId }).HasDatabaseName("ix_approvals_target");
             a.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CommunicationLog>(c =>
+        {
+            c.ToTable("communication_logs");
+            c.HasKey(x => x.Id);
+            Base(c);
+            c.Property(x => x.BranchId).HasColumnName("branch_id").IsRequired();
+            c.Property(x => x.JobCardId).HasColumnName("job_card_id").IsRequired();
+            c.Property(x => x.Channel).HasColumnName("channel").HasConversion<short>().IsRequired();
+            c.Property(x => x.MessageType).HasColumnName("message_type").HasConversion<short>().IsRequired();
+            c.Property(x => x.SentAt).HasColumnName("sent_at").HasDefaultValueSql("now()");
+            c.Property(x => x.Notes).HasColumnName("notes");
+            c.Property(x => x.SentByUserId).HasColumnName("sent_by_user_id").IsRequired();
+            c.HasIndex(x => x.JobCardId).HasDatabaseName("ix_commlogs_jobcard");
+            c.HasOne(x => x.JobCard).WithMany().HasForeignKey(x => x.JobCardId).OnDelete(DeleteBehavior.Cascade);
+            c.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 
