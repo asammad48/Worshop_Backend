@@ -42,6 +42,9 @@ builder.Services.AddScoped<IReportService, ReportService>();
 
 builder.Services.AddScoped<IJobCardPartsService, JobCardPartsService>();
 builder.Services.AddScoped<IRoadblockerService, RoadblockerService>();
+builder.Services.AddScoped<IJobTaskService, JobTaskService>();
+builder.Services.AddScoped<IGenericApprovalService, GenericApprovalService>();
+builder.Services.AddScoped<ICommunicationService, CommunicationService>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 
