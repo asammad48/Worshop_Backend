@@ -41,6 +41,7 @@ builder.Services.AddScoped<IFinanceService, FinanceService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 
 builder.Services.AddScoped<IJobCardPartsService, JobCardPartsService>();
+builder.Services.AddScoped<IPartRequestService, PartRequestService>();
 builder.Services.AddScoped<IRoadblockerService, RoadblockerService>();
 builder.Services.AddScoped<IJobTaskService, JobTaskService>();
 builder.Services.AddScoped<IGenericApprovalService, GenericApprovalService>();

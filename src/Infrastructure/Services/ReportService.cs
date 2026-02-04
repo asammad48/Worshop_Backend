@@ -48,4 +48,45 @@ public sealed class ReportService : IReportService
             .Select(x => new StuckVehicleResponse(x.Id, x.VehicleId, x.EntryAt, x.Status.ToString()))
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<RoadblockerAgingResponse>> GetRoadblockersAgingAsync(Guid branchId, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
+    {
+        var now = DateTimeOffset.UtcNow;
+        return await _db.Roadblockers.AsNoTracking()
+            .Where(x => !x.IsDeleted && !x.IsResolved && x.CreatedAtLocal >= from && x.CreatedAtLocal <= to)
+            .Join(_db.JobCards.AsNoTracking().Where(j => j.BranchId == branchId && !j.IsDeleted),
+                r => r.JobCardId, j => j.Id, (r, j) => r)
+            .Select(x => new RoadblockerAgingResponse(
+                x.Id,
+                x.JobCardId,
+                x.Type.ToString(),
+                x.Description ?? "",
+                x.CreatedAtLocal,
+                (int)(now - x.CreatedAtLocal).TotalDays))
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<StationTimeResponse>> GetStationTimeAsync(Guid branchId, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
+    {
+        var tasks = await _db.JobTasks.AsNoTracking()
+            .Where(x => !x.IsDeleted && x.StartedAt != null && x.StartedAt >= from && x.StartedAt <= to)
+            .Join(_db.JobCards.AsNoTracking().Where(j => j.BranchId == branchId && !j.IsDeleted),
+                t => t.JobCardId, j => j.Id, (t, j) => t)
+            .ToListAsync(ct);
+
+        return tasks
+            .GroupBy(x => new
+            {
+                x.StationCode,
+                Year = x.StartedAt!.Value.Year,
+                Week = System.Globalization.ISOWeek.GetWeekOfYear(x.StartedAt.Value.DateTime)
+            })
+            .Select(g => new StationTimeResponse(
+                g.Key.StationCode,
+                g.Key.Year,
+                g.Key.Week,
+                g.Sum(x => x.TotalMinutes)))
+            .OrderBy(x => x.Year).ThenBy(x => x.Week).ThenBy(x => x.StationCode)
+            .ToList();
+    }
 }

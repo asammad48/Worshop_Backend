@@ -76,7 +76,7 @@ public sealed class JobCardsController : ControllerBase
     {
         var branchId = User.GetBranchIdOrThrow();
         var userId = User.GetUserId();
-        return ApiResponse<JobCardResponse>.Ok(await _jobs.ChangeStatusAsync(userId, branchId, id, req.Status, ct));
+        return ApiResponse<JobCardResponse>.Ok(await _jobs.ChangeStatusAsync(userId, branchId, id, req.Status, req.Note, ct));
     }
 
     [HttpPost("{id:guid}/diagnosis")]

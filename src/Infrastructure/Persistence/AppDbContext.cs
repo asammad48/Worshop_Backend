@@ -30,6 +30,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<StockTransfer> StockTransfers => Set<StockTransfer>();
     public DbSet<StockTransferItem> StockTransferItems => Set<StockTransferItem>();
     public DbSet<JobCardPartUsage> JobCardPartUsages => Set<JobCardPartUsage>();
+    public DbSet<JobLineItem> JobLineItems => Set<JobLineItem>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<EmployeeProfile> EmployeeProfiles => Set<EmployeeProfile>();
     public DbSet<WagePayment> WagePayments => Set<WagePayment>();
@@ -37,6 +38,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Roadblocker> Roadblockers => Set<Roadblocker>();
     public DbSet<JobTask> JobTasks => Set<JobTask>();
+    public DbSet<JobPartRequest> JobPartRequests => Set<JobPartRequest>();
     public DbSet<Approval> Approvals => Set<Approval>();
     public DbSet<CommunicationLog> CommunicationLogs => Set<CommunicationLog>();
 
@@ -416,6 +418,7 @@ public sealed class AppDbContext : DbContext
             a.Property(x => x.ContentType).HasColumnName("content_type").IsRequired();
             a.Property(x => x.SizeBytes).HasColumnName("size_bytes").IsRequired();
             a.Property(x => x.StorageKey).HasColumnName("storage_key").IsRequired();
+            a.Property(x => x.Provider).HasColumnName("provider").HasConversion<short>().HasDefaultValue(StorageProvider.Local);
             a.Property(x => x.UploadedAt).HasColumnName("uploaded_at").HasDefaultValueSql("now()");
             a.Property(x => x.UploadedByUserId).HasColumnName("uploaded_by_user_id").IsRequired();
         });
@@ -502,6 +505,54 @@ public sealed class AppDbContext : DbContext
             c.HasIndex(x => x.JobCardId).HasDatabaseName("ix_commlogs_jobcard");
             c.HasOne(x => x.JobCard).WithMany().HasForeignKey(x => x.JobCardId).OnDelete(DeleteBehavior.Cascade);
             c.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<JobPartRequest>(r =>
+        {
+            r.ToTable("job_part_requests");
+            r.HasKey(x => x.Id);
+            Base(r);
+            r.Property(x => x.BranchId).HasColumnName("branch_id").IsRequired();
+            r.Property(x => x.JobCardId).HasColumnName("jobcard_id").IsRequired();
+            r.Property(x => x.PartId).HasColumnName("part_id").IsRequired();
+            r.Property(x => x.Qty).HasColumnName("qty").HasColumnType("numeric(12,2)");
+            r.Property(x => x.StationCode).HasColumnName("station_code").IsRequired();
+            r.Property(x => x.RequestedAt).HasColumnName("requested_at").IsRequired();
+            r.Property(x => x.OrderedAt).HasColumnName("ordered_at");
+            r.Property(x => x.ArrivedAt).HasColumnName("arrived_at");
+            r.Property(x => x.StationSignedByUserId).HasColumnName("station_signed_by_user_id");
+            r.Property(x => x.OfficeSignedByUserId).HasColumnName("office_signed_by_user_id");
+            r.Property(x => x.Status).HasColumnName("status").HasConversion<short>().IsRequired();
+            r.Property(x => x.SupplierId).HasColumnName("supplier_id");
+            r.Property(x => x.PurchaseOrderId).HasColumnName("purchase_order_id");
+
+            r.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+            r.HasOne(x => x.JobCard).WithMany().HasForeignKey(x => x.JobCardId).OnDelete(DeleteBehavior.Cascade);
+            r.HasOne(x => x.Part).WithMany().HasForeignKey(x => x.PartId).OnDelete(DeleteBehavior.Restrict);
+            r.HasOne(x => x.StationSignedByUser).WithMany().HasForeignKey(x => x.StationSignedByUserId).OnDelete(DeleteBehavior.Restrict);
+            r.HasOne(x => x.OfficeSignedByUser).WithMany().HasForeignKey(x => x.OfficeSignedByUserId).OnDelete(DeleteBehavior.Restrict);
+            r.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
+            r.HasOne(x => x.PurchaseOrder).WithMany().HasForeignKey(x => x.PurchaseOrderId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<JobLineItem>(i =>
+        {
+            i.ToTable("job_line_items");
+            i.HasKey(x => x.Id);
+            Base(i);
+            i.Property(x => x.JobCardId).HasColumnName("jobcard_id").IsRequired();
+            i.Property(x => x.Type).HasColumnName("type").HasConversion<short>().IsRequired();
+            i.Property(x => x.Title).HasColumnName("title").IsRequired();
+            i.Property(x => x.Qty).HasColumnName("qty").HasColumnType("numeric(12,2)");
+            i.Property(x => x.UnitPrice).HasColumnName("unit_price").HasColumnType("numeric(12,2)");
+            i.Property(x => x.Total).HasColumnName("total").HasColumnType("numeric(12,2)");
+            i.Property(x => x.Notes).HasColumnName("notes");
+            i.Property(x => x.PartId).HasColumnName("part_id");
+            i.Property(x => x.JobPartRequestId).HasColumnName("job_part_request_id");
+
+            i.HasOne(x => x.JobCard).WithMany().HasForeignKey(x => x.JobCardId).OnDelete(DeleteBehavior.Cascade);
+            i.HasOne(x => x.Part).WithMany().HasForeignKey(x => x.PartId).OnDelete(DeleteBehavior.Restrict);
+            i.HasOne(x => x.JobPartRequest).WithMany().HasForeignKey(x => x.JobPartRequestId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

@@ -80,12 +80,39 @@ public sealed class JobCardService : IJobCardService
         return Map(job);
     }
 
-    public async Task<JobCardResponse> ChangeStatusAsync(Guid actorUserId, Guid branchId, Guid id, JobCardStatus status, CancellationToken ct = default)
+    public async Task<JobCardResponse> ChangeStatusAsync(Guid actorUserId, Guid branchId, Guid id, JobCardStatus status, string? note = null, CancellationToken ct = default)
     {
         var job = await LoadBranchJob(branchId, id, ct);
-        // simple forward-only rule (allows setting to same or higher)
-        if ((short)status < (short)job.Status) throw new DomainException("Invalid status transition", 409);
+
+        // Transition Rules
+        if (status == job.Status) return Map(job);
+
+        // 1. Forward-only mostly, but allow some flexibility if needed?
+        // User example: "cannot go Pagado without billing paid"
+        if (status == JobCardStatus.Pagado)
+        {
+            var invoice = await _db.Invoices.FirstOrDefaultAsync(x => x.JobCardId == job.Id && !x.IsDeleted, ct);
+            if (invoice == null || invoice.PaymentStatus != PaymentStatus.Paid)
+            {
+                throw new DomainException("Cannot set status to Pagado until invoice is fully paid", 400);
+            }
+        }
+
+        var oldStatus = job.Status;
         job.Status = status;
+
+        _db.AuditLogs.Add(new Domain.Entities.AuditLog
+        {
+            BranchId = branchId,
+            Action = "JOB_CARD_STATUS_CHANGE",
+            EntityType = "JobCard",
+            EntityId = job.Id,
+            OldValue = oldStatus.ToString(),
+            NewValue = string.IsNullOrWhiteSpace(note) ? status.ToString() : $"{status} | Note: {note}",
+            PerformedByUserId = actorUserId,
+            PerformedAt = DateTimeOffset.UtcNow
+        });
+
         await _db.SaveChangesAsync(ct);
         return Map(job);
     }

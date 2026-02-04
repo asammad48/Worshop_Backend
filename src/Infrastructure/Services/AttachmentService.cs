@@ -1,5 +1,6 @@
 using Application.DTOs.Attachments;
 using Application.Services.Interfaces;
+using Domain.Enums;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Shared.Errors;
@@ -33,6 +34,7 @@ public sealed class AttachmentService : IAttachmentService
             ContentType = req.ContentType.Trim(),
             SizeBytes = req.SizeBytes,
             StorageKey = req.StorageKey.Trim(),
+            Provider = req.Provider,
             UploadedAt = DateTimeOffset.UtcNow,
             UploadedByUserId = actorUserId
         };
@@ -53,10 +55,22 @@ public sealed class AttachmentService : IAttachmentService
         return await _db.Attachments.AsNoTracking()
             .Where(x => !x.IsDeleted && x.OwnerType == ot && x.OwnerId == ownerId)
             .OrderByDescending(x => x.UploadedAt)
-            .Select(x => new AttachmentResponse(x.Id, x.OwnerType, x.OwnerId, x.FileName, x.ContentType, x.SizeBytes, x.StorageKey, x.UploadedAt, x.UploadedByUserId))
+            .Select(x => MapStatic(x))
             .ToListAsync(ct);
     }
 
+    public async Task<PresignResponse> PresignAsync(Guid actorUserId, Guid branchId, PresignRequest req, CancellationToken ct = default)
+    {
+        // Placeholder implementation
+        var storageKey = $"uploads/{branchId}/{Guid.NewGuid()}-{req.FileName}";
+        var dummyUrl = $"https://storage.placeholder.local/{storageKey}?token=dummy";
+
+        return await Task.FromResult(new PresignResponse(dummyUrl, storageKey, StorageProvider.Local));
+    }
+
     private static AttachmentResponse Map(Domain.Entities.Attachment x)
-        => new(x.Id, x.OwnerType, x.OwnerId, x.FileName, x.ContentType, x.SizeBytes, x.StorageKey, x.UploadedAt, x.UploadedByUserId);
+        => new(x.Id, x.OwnerType, x.OwnerId, x.FileName, x.ContentType, x.SizeBytes, x.StorageKey, x.Provider, x.UploadedAt, x.UploadedByUserId);
+
+    private static AttachmentResponse MapStatic(Domain.Entities.Attachment x)
+        => new(x.Id, x.OwnerType, x.OwnerId, x.FileName, x.ContentType, x.SizeBytes, x.StorageKey, x.Provider, x.UploadedAt, x.UploadedByUserId);
 }
