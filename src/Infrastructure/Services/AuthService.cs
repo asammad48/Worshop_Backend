@@ -1,6 +1,5 @@
 using Application.DTOs.Auth;
 using Application.Services.Interfaces;
-using BCrypt.Net;
 using Infrastructure.Auth;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -26,7 +25,7 @@ public sealed class AuthService : IAuthService
             throw new ValidationException("Invalid login request", new[] { "Email and password are required." });
 
         var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email.ToLower() == email && !x.IsDeleted && x.IsActive, ct);
-        if (user is null || !BCrypt.Verify(request.Password, user.PasswordHash))
+        if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             throw new DomainException("Invalid credentials", 401, new[] { "Invalid email or password." });
 
         var token = _jwt.CreateToken(user);

@@ -1,4 +1,3 @@
-using BCrypt.Net;
 using Domain.Entities;
 using Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -29,11 +28,11 @@ public static class DbInitializer
         if (!await db.Users.AnyAsync(ct))
         {
             db.Users.AddRange(
-                new User { Email = "admin@demo.com", PasswordHash = BCrypt.HashPassword("Admin@123"), Role = UserRole.HQ_ADMIN, BranchId = null, IsActive = true },
-                new User { Email = "manager@branch1.com", PasswordHash = BCrypt.HashPassword("Manager@123"), Role = UserRole.BRANCH_MANAGER, BranchId = b1.Id, IsActive = true },
-                new User { Email = "store@branch1.com", PasswordHash = BCrypt.HashPassword("Store@123"), Role = UserRole.STOREKEEPER, BranchId = b1.Id, IsActive = true },
-                new User { Email = "cashier@branch1.com", PasswordHash = BCrypt.HashPassword("Cashier@123"), Role = UserRole.CASHIER, BranchId = b1.Id, IsActive = true },
-                new User { Email = "tech@branch1.com", PasswordHash = BCrypt.HashPassword("Tech@123"), Role = UserRole.TECHNICIAN, BranchId = b1.Id, IsActive = true }
+                new User { Email = "admin@demo.com", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"), Role = UserRole.HQ_ADMIN, BranchId = null, IsActive = true },
+                new User { Email = "manager@branch1.com", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Manager@123"), Role = UserRole.BRANCH_MANAGER, BranchId = b1.Id, IsActive = true },
+                new User { Email = "store@branch1.com", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Store@123"), Role = UserRole.STOREKEEPER, BranchId = b1.Id, IsActive = true },
+                new User { Email = "cashier@branch1.com", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Cashier@123"), Role = UserRole.CASHIER, BranchId = b1.Id, IsActive = true },
+                new User { Email = "tech@branch1.com", PasswordHash = BCrypt.Net.BCrypt.HashPassword("Tech@123"), Role = UserRole.TECHNICIAN, BranchId = b1.Id, IsActive = true }
             );
             await db.SaveChangesAsync(ct);
         }

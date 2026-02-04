@@ -63,19 +63,30 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ValidIssuer = jwt.Issuer,
             ValidAudience = jwt.Audience,
-            IssuerSigningKey = key
+            IssuerSigningKey = key,
+            RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+            NameClaimType = "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
         };
     });
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("HQOnly", p => p.RequireClaim("role", "HQ_ADMIN"));
-    options.AddPolicy("BranchUser", p => p.RequireAssertion(ctx =>
-    {
-        var role = ctx.User.FindFirst("role")?.Value;
-        return role is "BRANCH_MANAGER" or "STOREKEEPER" or "CASHIER" or "TECHNICIAN" or "RECEPTIONIST" or "HQ_ADMIN";
-    }));
+    options.AddPolicy("HQOnly", policy =>
+        policy.RequireClaim("http://schemas.microsoft.com/ws/2008/06/identity/claims/role", "HQ_ADMIN"));
+
+    options.AddPolicy("BranchUser", policy =>
+        policy.RequireAssertion(ctx =>
+        {
+            var role = ctx.User.FindFirst("http://schemas.microsoft.com/ws/2008/06/identity/claims/role")?.Value;
+            return role is "BRANCH_MANAGER"
+                       or "STOREKEEPER"
+                       or "CASHIER"
+                       or "TECHNICIAN"
+                       or "RECEPTIONIST"
+                       or "HQ_ADMIN";
+        }));
 });
+
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -94,6 +105,20 @@ builder.Services.AddSwaggerGen(c =>
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         { scheme, new List<string>() }
+    });
+        c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference 
+                { 
+                    Type = ReferenceType.SecurityScheme, 
+                    Id = "Bearer" 
+                }
+            },
+            new string[] {} // scopes, leave empty for JWT
+        }
     });
 });
 
@@ -132,6 +157,7 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await DbInitializer.EnsureExtensionsAsync(db);
+    await db.Database.MigrateAsync();
     // NOTE: Do not auto-migrate here to avoid surprises; run EF migrations explicitly.
     await DbInitializer.SeedAsync(db);
 }

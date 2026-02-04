@@ -86,7 +86,7 @@ public sealed class ReportService : IReportService
                 g.Key.Year,
                 g.Key.Week,
                 g.Sum(x => x.TotalMinutes)))
-            .OrderBy(x => x.Year).ThenBy(x => x.Week).ThenBy(x => x.StationCode)
+            .OrderBy(x => x.Year).ThenBy(x => x.WeekNumber).ThenBy(x => x.StationCode)
             .ToList();
     }
 }

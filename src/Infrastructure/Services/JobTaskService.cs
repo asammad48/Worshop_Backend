@@ -44,7 +44,7 @@ public sealed class JobTaskService : IJobTaskService
         if (task.JobCard?.BranchId != branchId) throw new ForbiddenException("Wrong branch");
 
         if (task.Status != JobTaskStatus.Pending)
-            throw new ValidationException("Task is not in Pending status");
+            throw new ValidationException("Task is not in Pending status", new[] { "StorageKey required." });
 
         task.Status = JobTaskStatus.InProgress;
         task.StartedAt = DateTimeOffset.UtcNow;
@@ -66,7 +66,7 @@ public sealed class JobTaskService : IJobTaskService
         if (task.JobCard?.BranchId != branchId) throw new ForbiddenException("Wrong branch");
 
         if (task.Status != JobTaskStatus.InProgress)
-            throw new ValidationException("Task is not In Progress");
+            throw new ValidationException("Task is not In Progress", new[] { "Task is not In Progress." });
 
         task.Status = JobTaskStatus.Done;
         task.EndedAt = DateTimeOffset.UtcNow;
