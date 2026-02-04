@@ -1,3 +1,4 @@
+using Api.Security;
 using Application.DTOs.Auth;
 using Application.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -14,8 +15,22 @@ public sealed class AuthController : ControllerBase
     public AuthController(IAuthService auth) { _auth = auth; }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     public async Task<ActionResult<ApiResponse<LoginResponseDto>>> Login([FromBody] LoginRequestDto req, CancellationToken ct)
         => ApiResponse<LoginResponseDto>.Ok(await _auth.LoginAsync(req, ct));
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<string>>> ChangePassword([FromBody] ChangePasswordDto req, CancellationToken ct)
+    {
+        await _auth.ChangePasswordAsync(User.GetUserId(), req, ct);
+        return ApiResponse<string>.Ok("Password changed successfully");
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<ActionResult<ApiResponse<MeResponseDto>>> GetMe(CancellationToken ct)
+        => ApiResponse<MeResponseDto>.Ok(await _auth.GetMeAsync(User.GetUserId(), ct));
 
     [HttpGet("debug-claims")]
     [AllowAnonymous]

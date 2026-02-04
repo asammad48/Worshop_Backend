@@ -1,4 +1,5 @@
 using Application.DTOs.Auth;
+using Application.Security;
 using Application.Services.Interfaces;
 using Infrastructure.Auth;
 using Infrastructure.Persistence;
@@ -30,5 +31,27 @@ public sealed class AuthService : IAuthService
 
         var token = _jwt.CreateToken(user);
         return new LoginResponseDto(token, user.Role.ToString(), user.BranchId);
+    }
+
+    public async Task ChangePasswordAsync(Guid userId, ChangePasswordDto request, CancellationToken ct = default)
+    {
+        PasswordValidator.Validate(request.NewPassword);
+
+        var user = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId && !x.IsDeleted, ct);
+        if (user == null) throw new NotFoundException("User not found");
+
+        if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+            throw new ValidationException("Invalid current password", new[] { "The current password provided is incorrect." });
+
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<MeResponseDto> GetMeAsync(Guid userId, CancellationToken ct = default)
+    {
+        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == userId && !x.IsDeleted && x.IsActive, ct);
+        if (user == null) throw new NotFoundException("User not found or account is disabled.");
+
+        return new MeResponseDto(user.Id, user.Email, user.Role, user.BranchId);
     }
 }
