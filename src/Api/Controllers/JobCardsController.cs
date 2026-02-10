@@ -133,7 +133,7 @@ public sealed class JobCardsController : ControllerBase
     {
         var branchId = User.GetBranchIdOrThrow();
         var userId = User.GetUserId();
-        return ApiResponse<TimeLogResponse>.Ok(await _timelogs.StartAsync(userId, branchId, id, req.TechnicianUserId, ct));
+        return ApiResponse<TimeLogResponse>.Ok(await _timelogs.StartAsync(userId, branchId, id, req.TechnicianUserId, req.JobTaskId, ct));
     }
 
     [HttpPost("{id:guid}/timelogs/stop")]

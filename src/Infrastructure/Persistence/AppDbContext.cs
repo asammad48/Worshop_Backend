@@ -176,6 +176,7 @@ public sealed class AppDbContext : DbContext
             t.HasKey(x => x.Id);
             Base(t);
             t.Property(x => x.JobCardId).HasColumnName("jobcard_id").IsRequired();
+            t.Property(x => x.JobTaskId).HasColumnName("jobtask_id").IsRequired();
             t.Property(x => x.TechnicianUserId).HasColumnName("technician_user_id").IsRequired();
             t.Property(x => x.StartAt).HasColumnName("start_at").IsRequired();
             t.Property(x => x.EndAt).HasColumnName("end_at");

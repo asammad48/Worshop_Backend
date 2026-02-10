@@ -7,7 +7,7 @@ public static class ClaimsExtensions
 {
     public static Guid GetUserId(this ClaimsPrincipal user)
     {
-        var sub = user.FindFirstValue("sub");
+        var sub = user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
         if (sub is null || !Guid.TryParse(sub, out var id)) throw new ForbiddenException("Invalid user context");
         return id;
     }

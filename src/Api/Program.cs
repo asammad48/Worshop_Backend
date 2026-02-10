@@ -86,6 +86,14 @@ builder.Services.AddAuthorization(options =>
                        or "RECEPTIONIST"
                        or "HQ_ADMIN";
         }));
+
+    options.AddPolicy("HQManager", policy =>
+        policy.RequireAssertion(ctx =>
+        {
+            var role = ctx.User.FindFirst("http://schemas.microsoft.com/ws/2008/06/identity/claims/role")?.Value;
+            return role is "HQ_ADMIN"
+                       or "BRANCH_MANAGER";
+        }));
 });
 
 
@@ -123,8 +131,20 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
+
 var app = builder.Build();
 
+app.UseCors("AllowAll");
 // Error middleware
 app.Use(async (ctx, next) =>
 {

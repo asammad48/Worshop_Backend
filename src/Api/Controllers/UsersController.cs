@@ -9,7 +9,7 @@ namespace Api.Controllers;
 
 [ApiController]
 [Route("api/v1/users")]
-[Authorize(Policy = "HQOnly")]
+[Authorize(Policy = "HQManager")]
 public sealed class UsersController : ControllerBase
 {
     private readonly IUserService _users;
@@ -28,6 +28,7 @@ public sealed class UsersController : ControllerBase
         => ApiResponse<PageResponse<UserDto>>.Ok(await _users.GetPagedAsync(req, ct));
 
     [HttpGet("{id:guid}")]
+    //[Authorize(Policy = "HQManager")]
     public async Task<ActionResult<ApiResponse<UserDto>>> GetById(Guid id, CancellationToken ct)
         => ApiResponse<UserDto>.Ok(await _users.GetByIdAsync(id, ct));
 

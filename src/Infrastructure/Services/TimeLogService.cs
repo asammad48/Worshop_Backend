@@ -12,19 +12,20 @@ public sealed class TimeLogService : ITimeLogService
     private readonly AppDbContext _db;
     public TimeLogService(AppDbContext db) { _db = db; }
 
-    public async Task<TimeLogResponse> StartAsync(Guid actorUserId, Guid branchId, Guid jobCardId, Guid technicianUserId, CancellationToken ct = default)
+    public async Task<TimeLogResponse> StartAsync(Guid actorUserId, Guid branchId, Guid jobCardId, Guid technicianUserId,Guid jobTaskId, CancellationToken ct = default)
     {
-        var jobExists = await _db.JobCards.AnyAsync(x => x.Id == jobCardId && x.BranchId == branchId && !x.IsDeleted, ct);
-        if (!jobExists) throw new NotFoundException("Job card not found");
+        var jobTaskExists = await _db.JobTasks.AnyAsync(x => x.Id == jobTaskId && !x.IsDeleted, ct);
+        if (!jobTaskExists) throw new NotFoundException("Job task not found");
 
         var tech = await _db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == technicianUserId && x.BranchId == branchId && !x.IsDeleted && x.IsActive, ct);
         if (tech is null || tech.Role != UserRole.TECHNICIAN) throw new DomainException("Technician invalid", 409);
 
-        var openExists = await _db.JobCardTimeLogs.AnyAsync(x => x.JobCardId == jobCardId && x.TechnicianUserId == technicianUserId && x.EndAt == null && !x.IsDeleted, ct);
+        var openExists = await _db.JobCardTimeLogs.AnyAsync(x => x.JobTaskId == jobCardId && x.TechnicianUserId == technicianUserId && x.EndAt == null && !x.IsDeleted, ct);
         if (openExists) throw new DomainException("Time log already running", 409);
 
         var entity = new Domain.Entities.JobCardTimeLog
         {
+            JobTaskId = jobTaskId,
             JobCardId = jobCardId,
             TechnicianUserId = technicianUserId,
             StartAt = DateTimeOffset.UtcNow,
@@ -52,13 +53,14 @@ public sealed class TimeLogService : ITimeLogService
         return Map(log);
     }
 
-    public async Task<IReadOnlyList<TimeLogResponse>> ListAsync(Guid branchId, Guid jobCardId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TimeLogResponse>> ListAsync(Guid branchId, Guid jobTaskId, CancellationToken ct = default)
     {
-        var jobExists = await _db.JobCards.AnyAsync(x => x.Id == jobCardId && x.BranchId == branchId && !x.IsDeleted, ct);
-        if (!jobExists) throw new NotFoundException("Job card not found");
+        var jobTaskExists = await _db.JobTasks.AnyAsync(x => x.Id == jobTaskId && !x.IsDeleted, ct);
+
+        if (!jobTaskExists) throw new NotFoundException("Job task not found");
 
         return await _db.JobCardTimeLogs.AsNoTracking()
-            .Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+            .Where(x => x.JobTaskId == jobTaskId && !x.IsDeleted)
             .OrderByDescending(x => x.StartAt)
             .Select(x => new TimeLogResponse(x.Id, x.JobCardId, x.TechnicianUserId, x.StartAt, x.EndAt, x.TotalMinutes))
             .ToListAsync(ct);

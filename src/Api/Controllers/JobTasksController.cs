@@ -28,16 +28,15 @@ public sealed class JobTasksController : ControllerBase
     }
 
     [HttpPost("{id:guid}/start")]
-    public async Task<ActionResult<ApiResponse<JobTaskResponse>>> Start(Guid id, [FromBody] JobTaskStartRequest req, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<JobTaskResponse>>> Start(Guid id, CancellationToken ct)
     {
         var branchId = User.GetBranchIdOrThrow();
         var userId = User.GetUserId();
-        // Use id from route, but req.TaskId is also available
         return ApiResponse<JobTaskResponse>.Ok(await _service.StartAsync(userId, branchId, id, ct));
     }
 
     [HttpPost("{id:guid}/stop")]
-    public async Task<ActionResult<ApiResponse<JobTaskResponse>>> Stop(Guid id, [FromBody] JobTaskStopRequest req, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<JobTaskResponse>>> Stop(Guid id, CancellationToken ct)
     {
         var branchId = User.GetBranchIdOrThrow();
         var userId = User.GetUserId();

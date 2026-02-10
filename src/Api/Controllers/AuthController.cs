@@ -20,7 +20,7 @@ public sealed class AuthController : ControllerBase
         => ApiResponse<LoginResponseDto>.Ok(await _auth.LoginAsync(req, ct));
 
     [HttpPost("change-password")]
-    [Authorize]
+    [Authorize(Policy = "BranchUser")]
     public async Task<ActionResult<ApiResponse<string>>> ChangePassword([FromBody] ChangePasswordDto req, CancellationToken ct)
     {
         await _auth.ChangePasswordAsync(User.GetUserId(), req, ct);
@@ -28,7 +28,7 @@ public sealed class AuthController : ControllerBase
     }
 
     [HttpGet("me")]
-    [Authorize]
+    [Authorize(Policy = "BranchUser")]
     public async Task<ActionResult<ApiResponse<MeResponseDto>>> GetMe(CancellationToken ct)
         => ApiResponse<MeResponseDto>.Ok(await _auth.GetMeAsync(User.GetUserId(), ct));
 

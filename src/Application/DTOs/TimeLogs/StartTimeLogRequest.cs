@@ -1,2 +1,2 @@
 namespace Application.DTOs.TimeLogs;
-public sealed record StartTimeLogRequest(Guid TechnicianUserId);
+public sealed record StartTimeLogRequest(Guid TechnicianUserId,Guid JobTaskId);
