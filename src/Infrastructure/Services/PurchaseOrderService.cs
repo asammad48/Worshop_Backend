@@ -55,7 +55,7 @@ public sealed class PurchaseOrderService : IPurchaseOrderService
 
         await tx.CommitAsync(ct);
 
-        return Map(po);
+        return await GetByIdAsync(branchId, po.Id, ct);
     }
 
     public async Task<PurchaseOrderResponse> SubmitAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default)
@@ -65,7 +65,7 @@ public sealed class PurchaseOrderService : IPurchaseOrderService
         po.Status = PurchaseOrderStatus.Ordered;
         po.OrderedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
-        return Map(po);
+        return await GetByIdAsync(branchId, id, ct);
     }
 
     public async Task<PurchaseOrderResponse> ReceiveAsync(Guid actorUserId, Guid branchId, Guid id, PurchaseOrderReceiveRequest r, CancellationToken ct = default)
@@ -133,7 +133,7 @@ public sealed class PurchaseOrderService : IPurchaseOrderService
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
-        return Map(po);
+        return await GetByIdAsync(branchId, id, ct);
     }
 
     public async Task<PageResponse<PurchaseOrderResponse>> GetPagedAsync(Guid branchId, PageRequest r, CancellationToken ct = default)
@@ -143,24 +143,30 @@ public sealed class PurchaseOrderService : IPurchaseOrderService
         var page = Math.Max(1, r.PageNumber);
         var size = Math.Clamp(r.PageSize, 1, 100);
         var items = await q.OrderByDescending(x => x.CreatedAt).Skip((page-1)*size).Take(size)
-            .Select(x => new PurchaseOrderResponse(x.Id, x.BranchId, x.SupplierId, x.OrderNo, x.Status, x.OrderedAt, x.ReceivedAt, x.Notes))
+            .Select(x => new PurchaseOrderResponse(
+                x.Id, x.BranchId, x.SupplierId, x.OrderNo, x.Status, x.OrderedAt, x.ReceivedAt, x.Notes,
+                _db.Suppliers.Where(s => s.Id == x.SupplierId).Select(s => s.Name).FirstOrDefault()
+            ))
             .ToListAsync(ct);
         return new PageResponse<PurchaseOrderResponse>(items, total, page, size);
     }
 
     public async Task<PurchaseOrderResponse> GetByIdAsync(Guid branchId, Guid id, CancellationToken ct = default)
     {
-        var po = await _db.PurchaseOrders.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && x.BranchId == branchId && !x.IsDeleted, ct);
+        var po = await _db.PurchaseOrders.AsNoTracking()
+            .FirstOrDefaultAsync(x => x.Id == id && x.BranchId == branchId && !x.IsDeleted, ct);
         if (po is null) throw new NotFoundException("PO not found");
-        return Map(po);
+        var supplierName = await _db.Suppliers.Where(s => s.Id == po.SupplierId).Select(s => s.Name).FirstOrDefaultAsync(ct);
+        return new PurchaseOrderResponse(po.Id, po.BranchId, po.SupplierId, po.OrderNo, po.Status, po.OrderedAt, po.ReceivedAt, po.Notes, supplierName);
     }
 
     private async Task<PurchaseOrder> Load(Guid branchId, Guid id, CancellationToken ct)
     {
-        var po = await _db.PurchaseOrders.FirstOrDefaultAsync(x => x.Id == id && x.BranchId == branchId && !x.IsDeleted, ct);
+        var po = await _db.PurchaseOrders
+            .FirstOrDefaultAsync(x => x.Id == id && x.BranchId == branchId && !x.IsDeleted, ct);
         if (po is null) throw new NotFoundException("PO not found");
         return po;
     }
 
-    private static PurchaseOrderResponse Map(PurchaseOrder x) => new(x.Id, x.BranchId, x.SupplierId, x.OrderNo, x.Status, x.OrderedAt, x.ReceivedAt, x.Notes);
+    private static PurchaseOrderResponse Map(PurchaseOrder x) => new(x.Id, x.BranchId, x.SupplierId, x.OrderNo, x.Status, x.OrderedAt, x.ReceivedAt, x.Notes, null);
 }

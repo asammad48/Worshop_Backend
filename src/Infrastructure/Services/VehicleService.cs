@@ -36,7 +36,7 @@ public sealed class VehicleService : IVehicleService
         };
         _db.Vehicles.Add(entity);
         await _db.SaveChangesAsync(ct);
-        return new VehicleResponse(entity.Id, entity.Plate, entity.Make, entity.Model, entity.Year, entity.CustomerId);
+        return await GetByIdAsync(entity.Id, ct);
     }
 
     public async Task<PageResponse<VehicleResponse>> GetPagedAsync(PageRequest r, CancellationToken ct = default)
@@ -52,15 +52,17 @@ public sealed class VehicleService : IVehicleService
         var size = Math.Clamp(r.PageSize, 1, 100);
         var items = await q.OrderBy(x => x.Plate)
             .Skip((page - 1) * size).Take(size)
-            .Select(x => new VehicleResponse(x.Id, x.Plate, x.Make, x.Model, x.Year, x.CustomerId))
+            .Select(x => new VehicleResponse(x.Id, x.Plate, x.Make, x.Model, x.Year, x.CustomerId, x.Customer != null ? x.Customer.FullName : null))
             .ToListAsync(ct);
         return new PageResponse<VehicleResponse>(items, total, page, size);
     }
 
     public async Task<VehicleResponse> GetByIdAsync(Guid id, CancellationToken ct = default)
     {
-        var v = await _db.Vehicles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        var v = await _db.Vehicles.AsNoTracking()
+            .Include(x => x.Customer)
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
         if (v is null) throw new NotFoundException("Vehicle not found");
-        return new VehicleResponse(v.Id, v.Plate, v.Make, v.Model, v.Year, v.CustomerId);
+        return new VehicleResponse(v.Id, v.Plate, v.Make, v.Model, v.Year, v.CustomerId, v.Customer?.FullName);
     }
 }

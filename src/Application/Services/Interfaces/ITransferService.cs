@@ -9,4 +9,5 @@ public interface ITransferService
     Task<TransferResponse> ShipAsync(Guid actorUserId, Guid fromBranchId, Guid id, CancellationToken ct=default);
     Task<TransferResponse> ReceiveAsync(Guid actorUserId, Guid toBranchId, Guid id, CancellationToken ct=default);
     Task<PageResponse<TransferResponse>> GetPagedAsync(Guid branchId, PageRequest r, CancellationToken ct=default);
+    Task<TransferResponse> GetByIdAsync(Guid id, CancellationToken ct=default);
 }

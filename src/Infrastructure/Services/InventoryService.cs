@@ -85,12 +85,13 @@ public sealed class InventoryService : IInventoryService
         var e = new Location { BranchId = branchId, Code = code, Name = name, IsActive = true };
         _db.Locations.Add(e);
         await _db.SaveChangesAsync(ct);
-        return new LocationResponse(e.Id, e.BranchId, e.Code, e.Name, e.IsActive);
+        var branch = await _db.Branches.AsNoTracking().FirstOrDefaultAsync(x => x.Id == branchId, ct);
+        return new LocationResponse(e.Id, e.BranchId, e.Code, e.Name, e.IsActive, branch?.Name);
     }
 
     public async Task<PageResponse<LocationResponse>> GetLocationsAsync(Guid branchId, PageRequest r, CancellationToken ct = default)
     {
-        var q = _db.Locations.AsNoTracking().Where(x => !x.IsDeleted && x.BranchId == branchId);
+        var q = _db.Locations.AsNoTracking().Include(x => x.Branch).Where(x => !x.IsDeleted && x.BranchId == branchId);
         if (!string.IsNullOrWhiteSpace(r.Search))
         {
             var s = r.Search.Trim().ToUpperInvariant();
@@ -100,7 +101,7 @@ public sealed class InventoryService : IInventoryService
         var page = Math.Max(1, r.PageNumber);
         var size = Math.Clamp(r.PageSize, 1, 100);
         var items = await q.OrderBy(x => x.Code).Skip((page-1)*size).Take(size)
-            .Select(x => new LocationResponse(x.Id, x.BranchId, x.Code, x.Name, x.IsActive)).ToListAsync(ct);
+            .Select(x => new LocationResponse(x.Id, x.BranchId, x.Code, x.Name, x.IsActive, x.Branch != null ? x.Branch.Name : null)).ToListAsync(ct);
         return new PageResponse<LocationResponse>(items, total, page, size);
     }
 
@@ -113,7 +114,12 @@ public sealed class InventoryService : IInventoryService
         var page = Math.Max(1, r.PageNumber);
         var size = Math.Clamp(r.PageSize, 1, 100);
         var items = await q.OrderBy(x => x.PartId).Skip((page-1)*size).Take(size)
-            .Select(x => new StockItemResponse(x.PartId, x.LocationId, x.QuantityOnHand)).ToListAsync(ct);
+            .Select(x => new StockItemResponse(
+                x.PartId, x.LocationId, x.QuantityOnHand,
+                x.Part != null ? x.Part.Sku : null,
+                x.Part != null ? x.Part.Name : null,
+                x.Location != null ? x.Location.Code : null,
+                x.Location != null ? x.Location.Name : null)).ToListAsync(ct);
         return new PageResponse<StockItemResponse>(items, total, page, size);
     }
 
@@ -164,7 +170,14 @@ public sealed class InventoryService : IInventoryService
         var page = Math.Max(1, r.PageNumber);
         var size = Math.Clamp(r.PageSize, 1, 100);
         var items = await q.OrderByDescending(x => x.PerformedAt).Skip((page-1)*size).Take(size)
-            .Select(x => new LedgerRowResponse(x.Id, x.BranchId, x.LocationId, x.PartId, x.MovementType, x.ReferenceType, x.ReferenceId, x.QuantityDelta, x.UnitCost, x.Notes, x.PerformedByUserId, x.PerformedAt))
+            .Select(x => new LedgerRowResponse(
+                x.Id, x.BranchId, x.LocationId, x.PartId, x.MovementType, x.ReferenceType, x.ReferenceId, x.QuantityDelta, x.UnitCost, x.Notes, x.PerformedByUserId, x.PerformedAt,
+                _db.Parts.Where(p => p.Id == x.PartId).Select(p => p.Sku).FirstOrDefault(),
+                _db.Parts.Where(p => p.Id == x.PartId).Select(p => p.Name).FirstOrDefault(),
+                _db.Locations.Where(l => l.Id == x.LocationId).Select(l => l.Code).FirstOrDefault(),
+                _db.Locations.Where(l => l.Id == x.LocationId).Select(l => l.Name).FirstOrDefault(),
+                _db.Users.Where(u => u.Id == x.PerformedByUserId).Select(u => u.Email).FirstOrDefault()
+            ))
             .ToListAsync(ct);
         return new PageResponse<LedgerRowResponse>(items, total, page, size);
     }

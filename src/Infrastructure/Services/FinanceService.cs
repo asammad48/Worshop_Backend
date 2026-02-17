@@ -26,7 +26,8 @@ public sealed class FinanceService : IFinanceService
         };
         _db.Expenses.Add(e);
         await _db.SaveChangesAsync(ct);
-        return new ExpenseResponse(e.Id, e.BranchId, e.Category, e.Amount, e.Description, e.ExpenseAt);
+        var branch = await _db.Branches.AsNoTracking().FirstOrDefaultAsync(x => x.Id == branchId, ct);
+        return new ExpenseResponse(e.Id, e.BranchId, e.Category, e.Amount, e.Description, e.ExpenseAt, branch?.Name);
     }
 
     public async Task<PageResponse<ExpenseResponse>> GetExpensesAsync(Guid branchId, PageRequest r, DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken ct = default)
@@ -39,7 +40,10 @@ public sealed class FinanceService : IFinanceService
         var page = Math.Max(1, r.PageNumber);
         var size = Math.Clamp(r.PageSize, 1, 100);
         var items = await q.OrderByDescending(x => x.ExpenseAt).Skip((page-1)*size).Take(size)
-            .Select(x => new ExpenseResponse(x.Id, x.BranchId, x.Category, x.Amount, x.Description, x.ExpenseAt))
+            .Select(x => new ExpenseResponse(
+                x.Id, x.BranchId, x.Category, x.Amount, x.Description, x.ExpenseAt,
+                _db.Branches.Where(b => b.Id == x.BranchId).Select(b => b.Name).FirstOrDefault()
+            ))
             .ToListAsync(ct);
         return new PageResponse<ExpenseResponse>(items, total, page, size);
     }
@@ -63,7 +67,10 @@ public sealed class FinanceService : IFinanceService
         };
         _db.WagePayments.Add(wp);
         await _db.SaveChangesAsync(ct);
-        return new WagePayResponse(wp.Id, wp.BranchId, wp.EmployeeUserId, wp.Amount, wp.PeriodStart, wp.PeriodEnd, wp.PaidAt, wp.PaidByUserId, wp.Notes);
+
+        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == r.EmployeeUserId, ct);
+        var branch = await _db.Branches.AsNoTracking().FirstOrDefaultAsync(x => x.Id == branchId, ct);
+        return new WagePayResponse(wp.Id, wp.BranchId, wp.EmployeeUserId, wp.Amount, wp.PeriodStart, wp.PeriodEnd, wp.PaidAt, wp.PaidByUserId, wp.Notes, user?.Email, branch?.Name);
     }
 
     public async Task<PageResponse<WagePayResponse>> GetWagesAsync(Guid branchId, PageRequest r, DateTimeOffset? from = null, DateTimeOffset? to = null, CancellationToken ct = default)
@@ -76,7 +83,11 @@ public sealed class FinanceService : IFinanceService
         var page = Math.Max(1, r.PageNumber);
         var size = Math.Clamp(r.PageSize, 1, 100);
         var items = await q.OrderByDescending(x => x.PaidAt).Skip((page-1)*size).Take(size)
-            .Select(x => new WagePayResponse(x.Id, x.BranchId, x.EmployeeUserId, x.Amount, x.PeriodStart, x.PeriodEnd, x.PaidAt, x.PaidByUserId, x.Notes))
+            .Select(x => new WagePayResponse(
+                x.Id, x.BranchId, x.EmployeeUserId, x.Amount, x.PeriodStart, x.PeriodEnd, x.PaidAt, x.PaidByUserId, x.Notes,
+                _db.Users.Where(u => u.Id == x.EmployeeUserId).Select(u => u.Email).FirstOrDefault(),
+                _db.Branches.Where(b => b.Id == x.BranchId).Select(b => b.Name).FirstOrDefault()
+            ))
             .ToListAsync(ct);
         return new PageResponse<WagePayResponse>(items, total, page, size);
     }
