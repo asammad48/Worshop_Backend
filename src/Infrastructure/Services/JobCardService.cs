@@ -32,7 +32,7 @@ public sealed class JobCardService : IJobCardService
         };
         _db.JobCards.Add(job);
         await _db.SaveChangesAsync(ct);
-        return Map(job);
+        return await GetByIdAsync(branchId, job.Id, ct);
     }
 
     public async Task<PageResponse<JobCardResponse>> GetPagedAsync(Guid branchId, PageRequest request, CancellationToken ct = default)
@@ -49,16 +49,57 @@ public sealed class JobCardService : IJobCardService
         var size = Math.Clamp(request.PageSize, 1, 100);
         var items = await q.OrderByDescending(x => x.CreatedAt)
             .Skip((page - 1) * size).Take(size)
-            .Select(x => new JobCardResponse(x.Id, x.BranchId, x.CustomerId, x.VehicleId, x.Status, x.EntryAt, x.ExitAt, x.Mileage, x.InitialReport, x.Diagnosis))
+            .Select(x => new JobCardResponse(
+                x.Id,
+                x.BranchId,
+                x.CustomerId,
+                x.VehicleId,
+                x.Status,
+                x.EntryAt,
+                x.ExitAt,
+                x.Mileage,
+                x.InitialReport,
+                x.Diagnosis,
+                x.Customer != null ? x.Customer.FullName : null,
+                x.Vehicle != null ? x.Vehicle.Plate : null,
+                x.Branch != null ? x.Branch.Name : null,
+                _db.JobCardWorkStationHistories
+                    .Where(h => h.JobCardId == x.Id && !h.IsDeleted)
+                    .OrderByDescending(h => h.MovedAt)
+                    .Select(h => h.WorkStation != null ? h.WorkStation.Name : null)
+                    .FirstOrDefault(),
+                _db.JobCardWorkStationHistories
+                    .Where(h => h.JobCardId == x.Id && !h.IsDeleted)
+                    .OrderByDescending(h => h.MovedAt)
+                    .Select(h => h.WorkStation != null ? h.WorkStation.Code : null)
+                    .FirstOrDefault()
+            ))
             .ToListAsync(ct);
         return new PageResponse<JobCardResponse>(items, total, page, size);
     }
 
     public async Task<JobCardResponse> GetByIdAsync(Guid branchId, Guid id, CancellationToken ct = default)
     {
-        var job = await _db.JobCards.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted && x.BranchId == branchId, ct);
-        if (job is null) throw new NotFoundException("Job card not found");
-        return Map(job);
+        var x = await _db.JobCards.AsNoTracking()
+            .Include(j => j.Customer)
+            .Include(j => j.Vehicle)
+            .Include(j => j.Branch)
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted && x.BranchId == branchId, ct);
+        if (x is null) throw new NotFoundException("Job card not found");
+
+        var station = await _db.JobCardWorkStationHistories
+            .Where(h => h.JobCardId == x.Id && !h.IsDeleted)
+            .OrderByDescending(h => h.MovedAt)
+            .Select(h => new {
+                Name = h.WorkStation != null ? h.WorkStation.Name : null,
+                Code = h.WorkStation != null ? h.WorkStation.Code : null
+            })
+            .FirstOrDefaultAsync(ct);
+
+        return new JobCardResponse(
+            x.Id, x.BranchId, x.CustomerId, x.VehicleId, x.Status, x.EntryAt, x.ExitAt, x.Mileage, x.InitialReport, x.Diagnosis,
+            x.Customer?.FullName, x.Vehicle?.Plate, x.Branch?.Name,
+            station?.Name, station?.Code);
     }
 
     public async Task<JobCardResponse> CheckInAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default)
@@ -67,7 +108,7 @@ public sealed class JobCardService : IJobCardService
         if (job.EntryAt is not null) throw new DomainException("Already checked in", 409);
         job.EntryAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
-        return Map(job);
+        return await GetByIdAsync(branchId, id, ct);
     }
 
     public async Task<JobCardResponse> CheckOutAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default)
@@ -77,7 +118,7 @@ public sealed class JobCardService : IJobCardService
         if (job.Status != JobCardStatus.Pagado) throw new DomainException("Cannot check out until paid", 409);
         job.ExitAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
-        return Map(job);
+        return await GetByIdAsync(branchId, id, ct);
     }
 
     public async Task<JobCardResponse> ChangeStatusAsync(Guid actorUserId, Guid branchId, Guid id, JobCardStatus status, string? note = null, CancellationToken ct = default)
@@ -114,7 +155,7 @@ public sealed class JobCardService : IJobCardService
         });
 
         await _db.SaveChangesAsync(ct);
-        return Map(job);
+        return await GetByIdAsync(branchId, id, ct);
     }
 
     public async Task<JobCardResponse> UpdateDiagnosisAsync(Guid actorUserId, Guid branchId, Guid id, string? diagnosis, CancellationToken ct = default)
@@ -122,16 +163,36 @@ public sealed class JobCardService : IJobCardService
         var job = await LoadBranchJob(branchId, id, ct);
         job.Diagnosis = diagnosis?.Trim();
         await _db.SaveChangesAsync(ct);
-        return Map(job);
+        return await GetByIdAsync(branchId, id, ct);
     }
 
     private async Task<Domain.Entities.JobCard> LoadBranchJob(Guid branchId, Guid id, CancellationToken ct)
     {
-        var job = await _db.JobCards.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted && x.BranchId == branchId, ct);
+        var job = await _db.JobCards
+            .Include(x => x.Customer)
+            .Include(x => x.Vehicle)
+            .Include(x => x.Branch)
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted && x.BranchId == branchId, ct);
         if (job is null) throw new NotFoundException("Job card not found");
         return job;
     }
 
     private static JobCardResponse Map(Domain.Entities.JobCard x) =>
-        new(x.Id, x.BranchId, x.CustomerId, x.VehicleId, x.Status, x.EntryAt, x.ExitAt, x.Mileage, x.InitialReport, x.Diagnosis);
+        new(
+            x.Id,
+            x.BranchId,
+            x.CustomerId,
+            x.VehicleId,
+            x.Status,
+            x.EntryAt,
+            x.ExitAt,
+            x.Mileage,
+            x.InitialReport,
+            x.Diagnosis,
+            x.Customer?.FullName,
+            x.Vehicle?.Plate,
+            x.Branch?.Name,
+            null, // Map cannot easily fetch history without DB context
+            null
+        );
 }

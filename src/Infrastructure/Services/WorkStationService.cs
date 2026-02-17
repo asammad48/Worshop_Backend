@@ -26,12 +26,13 @@ public sealed class WorkStationService : IWorkStationService
         var entity = new Domain.Entities.WorkStation { BranchId = branchId, Code = code, Name = name, IsActive = true };
         _db.WorkStations.Add(entity);
         await _db.SaveChangesAsync(ct);
-        return new WorkStationResponse(entity.Id, entity.BranchId, entity.Code, entity.Name, entity.IsActive);
+        var branch = await _db.Branches.AsNoTracking().FirstOrDefaultAsync(x => x.Id == branchId, ct);
+        return new WorkStationResponse(entity.Id, entity.BranchId, entity.Code, entity.Name, entity.IsActive, branch?.Name);
     }
 
     public async Task<PageResponse<WorkStationResponse>> GetPagedAsync(Guid branchId, PageRequest request, CancellationToken ct = default)
     {
-        var q = _db.WorkStations.AsNoTracking().Where(x => !x.IsDeleted && x.BranchId == branchId);
+        var q = _db.WorkStations.AsNoTracking().Include(x => x.Branch).Where(x => !x.IsDeleted && x.BranchId == branchId);
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var s = request.Search.Trim().ToUpperInvariant();
@@ -42,7 +43,7 @@ public sealed class WorkStationService : IWorkStationService
         var size = Math.Clamp(request.PageSize, 1, 100);
         var items = await q.OrderBy(x => x.Code)
             .Skip((page - 1) * size).Take(size)
-            .Select(x => new WorkStationResponse(x.Id, x.BranchId, x.Code, x.Name, x.IsActive))
+            .Select(x => new WorkStationResponse(x.Id, x.BranchId, x.Code, x.Name, x.IsActive, x.Branch != null ? x.Branch.Name : null))
             .ToListAsync(ct);
         return new PageResponse<WorkStationResponse>(items, total, page, size);
     }

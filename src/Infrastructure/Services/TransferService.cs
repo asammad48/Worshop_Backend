@@ -36,7 +36,7 @@ public sealed class TransferService : ITransferService
             _db.StockTransferItems.Add(new StockTransferItem { StockTransferId = t.Id, PartId = it.PartId, Qty = it.Qty });
         }
         await _db.SaveChangesAsync(ct);
-        return Map(t);
+        return await GetByIdAsync(t.Id, ct);
     }
 
     public async Task<TransferResponse> RequestAsync(Guid actorUserId, Guid fromBranchId, Guid id, CancellationToken ct = default)
@@ -47,7 +47,7 @@ public sealed class TransferService : ITransferService
         t.Status = StockTransferStatus.Requested;
         t.RequestedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync(ct);
-        return Map(t);
+        return await GetByIdAsync(id, ct);
     }
 
     public async Task<TransferResponse> ShipAsync(Guid actorUserId, Guid fromBranchId, Guid id, CancellationToken ct = default)
@@ -88,7 +88,7 @@ public sealed class TransferService : ITransferService
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
-        return Map(t);
+        return await GetByIdAsync(id, ct);
     }
 
     public async Task<TransferResponse> ReceiveAsync(Guid actorUserId, Guid toBranchId, Guid id, CancellationToken ct = default)
@@ -134,7 +134,22 @@ public sealed class TransferService : ITransferService
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
-        return Map(t);
+        return await GetByIdAsync(id, ct);
+    }
+
+    public async Task<TransferResponse> GetByIdAsync(Guid id, CancellationToken ct = default)
+    {
+        var x = await _db.StockTransfers.AsNoTracking().FirstOrDefaultAsync(t => t.Id == id && !t.IsDeleted, ct);
+        if (x is null) throw new NotFoundException("Transfer not found");
+
+        return new TransferResponse(
+            x.Id, x.TransferNo, x.Status, x.FromBranchId, x.FromLocationId, x.ToBranchId, x.ToLocationId,
+            x.RequestedAt, x.ShippedAt, x.ReceivedAt, x.Notes,
+            await _db.Branches.Where(b => b.Id == x.FromBranchId).Select(b => b.Name).FirstOrDefaultAsync(ct),
+            await _db.Branches.Where(b => b.Id == x.ToBranchId).Select(b => b.Name).FirstOrDefaultAsync(ct),
+            await _db.Locations.Where(l => l.Id == x.FromLocationId).Select(l => l.Name).FirstOrDefaultAsync(ct),
+            await _db.Locations.Where(l => l.Id == x.ToLocationId).Select(l => l.Name).FirstOrDefaultAsync(ct)
+        );
     }
 
     public async Task<PageResponse<TransferResponse>> GetPagedAsync(Guid branchId, PageRequest r, CancellationToken ct = default)
@@ -144,17 +159,28 @@ public sealed class TransferService : ITransferService
         var page = Math.Max(1, r.PageNumber);
         var size = Math.Clamp(r.PageSize, 1, 100);
         var items = await q.OrderByDescending(x => x.CreatedAt).Skip((page-1)*size).Take(size)
-            .Select(x => new TransferResponse(x.Id, x.TransferNo, x.Status, x.FromBranchId, x.FromLocationId, x.ToBranchId, x.ToLocationId, x.RequestedAt, x.ShippedAt, x.ReceivedAt, x.Notes))
+            .Select(x => new TransferResponse(
+                x.Id, x.TransferNo, x.Status, x.FromBranchId, x.FromLocationId, x.ToBranchId, x.ToLocationId,
+                x.RequestedAt, x.ShippedAt, x.ReceivedAt, x.Notes,
+                _db.Branches.Where(b => b.Id == x.FromBranchId).Select(b => b.Name).FirstOrDefault(),
+                _db.Branches.Where(b => b.Id == x.ToBranchId).Select(b => b.Name).FirstOrDefault(),
+                _db.Locations.Where(l => l.Id == x.FromLocationId).Select(l => l.Name).FirstOrDefault(),
+                _db.Locations.Where(l => l.Id == x.ToLocationId).Select(l => l.Name).FirstOrDefault()
+            ))
             .ToListAsync(ct);
         return new PageResponse<TransferResponse>(items, total, page, size);
     }
 
     private async Task<StockTransfer> LoadRelevant(Guid id, CancellationToken ct)
     {
-        var t = await _db.StockTransfers.FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
+        var t = await _db.StockTransfers
+            .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
         if (t is null) throw new NotFoundException("Transfer not found");
         return t;
     }
 
-    private static TransferResponse Map(StockTransfer x) => new(x.Id, x.TransferNo, x.Status, x.FromBranchId, x.FromLocationId, x.ToBranchId, x.ToLocationId, x.RequestedAt, x.ShippedAt, x.ReceivedAt, x.Notes);
+    private static TransferResponse Map(StockTransfer x) => new(
+        x.Id, x.TransferNo, x.Status, x.FromBranchId, x.FromLocationId, x.ToBranchId, x.ToLocationId,
+        x.RequestedAt, x.ShippedAt, x.ReceivedAt, x.Notes,
+        null, null, null, null);
 }

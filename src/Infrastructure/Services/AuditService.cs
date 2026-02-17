@@ -21,7 +21,11 @@ public sealed class AuditService : IAuditService
         var size = Math.Clamp(req.PageSize, 1, 100);
 
         var items = await q.OrderByDescending(x => x.PerformedAt).Skip((page-1)*size).Take(size)
-            .Select(x => new AuditLogResponse(x.Id, x.BranchId, x.Action, x.EntityType, x.EntityId, x.OldValue, x.NewValue, x.PerformedByUserId, x.PerformedAt))
+            .Select(x => new AuditLogResponse(
+                x.Id, x.BranchId, x.Action, x.EntityType, x.EntityId, x.OldValue, x.NewValue, x.PerformedByUserId, x.PerformedAt,
+                _db.Users.Where(u => u.Id == x.PerformedByUserId).Select(u => u.Email).FirstOrDefault(),
+                x.BranchId != null ? _db.Branches.Where(b => b.Id == x.BranchId).Select(b => b.Name).FirstOrDefault() : null
+            ))
             .ToListAsync(ct);
 
         return new PageResponse<AuditLogResponse>(items, total, page, size);
