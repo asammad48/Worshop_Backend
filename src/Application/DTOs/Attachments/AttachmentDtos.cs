@@ -22,7 +22,9 @@ public sealed record AttachmentResponse(
     string StorageKey,
     StorageProvider Provider,
     DateTimeOffset UploadedAt,
-    Guid UploadedByUserId
+    Guid UploadedByUserId,
+    string? UploadedByEmail = null,
+    string? OwnerDisplay = null
 );
 
 public sealed record PresignRequest(string FileName, string ContentType);

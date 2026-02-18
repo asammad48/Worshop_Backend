@@ -40,23 +40,56 @@ public sealed class AttachmentService : IAttachmentService
         };
         _db.Attachments.Add(a);
         await _db.SaveChangesAsync(ct);
-        return Map(a);
+        return await GetByIdInternalAsync(a.Id, ct);
     }
 
     public async Task<IReadOnlyList<AttachmentResponse>> ListAsync(Guid branchId, string ownerType, Guid ownerId, CancellationToken ct = default)
     {
         var ot = (ownerType ?? "").Trim().ToUpperInvariant();
-        if (ot == "JOBCARD")
+        if (ot == "JOBCARD" || ot == "JOB_CARD")
         {
             var ok = await _db.JobCards.AnyAsync(x => x.Id == ownerId && x.BranchId == branchId && !x.IsDeleted, ct);
             if (!ok) throw new NotFoundException("Owner not found");
         }
 
-        return await _db.Attachments.AsNoTracking()
-            .Where(x => !x.IsDeleted && x.OwnerType == ot && x.OwnerId == ownerId)
-            .OrderByDescending(x => x.UploadedAt)
-            .Select(x => MapStatic(x))
-            .ToListAsync(ct);
+        var ownerDisplay = await GetOwnerDisplayAsync(ot, ownerId, ct);
+
+        return await (from a in _db.Attachments.Where(x => !x.IsDeleted && x.OwnerType == ot && x.OwnerId == ownerId)
+                      join u in _db.Users on a.UploadedByUserId equals u.Id
+                      orderby a.UploadedAt descending
+                      select new AttachmentResponse(
+                          a.Id, a.OwnerType, a.OwnerId, a.FileName, a.ContentType, a.SizeBytes, a.StorageKey, a.Provider, a.UploadedAt, a.UploadedByUserId,
+                          u.Email, ownerDisplay
+                      )).ToListAsync(ct);
+    }
+
+    private async Task<AttachmentResponse> GetByIdInternalAsync(Guid attachmentId, CancellationToken ct)
+    {
+        var a = await _db.Attachments.FirstOrDefaultAsync(x => x.Id == attachmentId && !x.IsDeleted, ct);
+        if (a == null) throw new NotFoundException("Attachment not found");
+
+        var userEmail = await _db.Users.Where(x => x.Id == a.UploadedByUserId).Select(x => x.Email).FirstOrDefaultAsync(ct);
+        var ownerDisplay = await GetOwnerDisplayAsync(a.OwnerType, a.OwnerId, ct);
+
+        return new AttachmentResponse(
+            a.Id, a.OwnerType, a.OwnerId, a.FileName, a.ContentType, a.SizeBytes, a.StorageKey, a.Provider, a.UploadedAt, a.UploadedByUserId,
+            userEmail, ownerDisplay);
+    }
+
+    private async Task<string?> GetOwnerDisplayAsync(string ownerType, Guid ownerId, CancellationToken ct)
+    {
+        var ot = (ownerType ?? "").Trim().ToUpperInvariant();
+        if (ot == "JOBCARD" || ot == "JOB_CARD")
+        {
+            var plate = await _db.JobCards.Where(x => x.Id == ownerId).Select(x => x.Vehicle!.Plate).FirstOrDefaultAsync(ct);
+            return $"JOB_CARD — {plate}";
+        }
+        if (ot == "PURCHASE_ORDER")
+        {
+            var orderNo = await _db.PurchaseOrders.Where(x => x.Id == ownerId).Select(x => x.OrderNo).FirstOrDefaultAsync(ct);
+            return $"PURCHASE_ORDER — {orderNo}";
+        }
+        return $"{ot} — {ownerId}";
     }
 
     public async Task<PresignResponse> PresignAsync(Guid actorUserId, Guid branchId, PresignRequest req, CancellationToken ct = default)

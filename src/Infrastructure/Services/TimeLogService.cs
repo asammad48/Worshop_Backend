@@ -34,7 +34,7 @@ public sealed class TimeLogService : ITimeLogService
         };
         _db.JobCardTimeLogs.Add(entity);
         await _db.SaveChangesAsync(ct);
-        return Map(entity);
+        return await GetByIdInternalAsync(branchId, entity.Id, ct);
     }
 
     public async Task<TimeLogResponse> StopAsync(Guid actorUserId, Guid branchId, Guid jobCardId, Guid timeLogId, CancellationToken ct = default)
@@ -50,7 +50,7 @@ public sealed class TimeLogService : ITimeLogService
         log.EndAt = DateTimeOffset.UtcNow;
         log.TotalMinutes = (int)Math.Max(0, (log.EndAt.Value - log.StartAt).TotalMinutes);
         await _db.SaveChangesAsync(ct);
-        return Map(log);
+        return await GetByIdInternalAsync(branchId, log.Id, ct);
     }
 
     public async Task<IReadOnlyList<TimeLogResponse>> ListAsync(Guid branchId, Guid jobTaskId, CancellationToken ct = default)
@@ -59,11 +59,31 @@ public sealed class TimeLogService : ITimeLogService
 
         if (!jobTaskExists) throw new NotFoundException("Job task not found");
 
-        return await _db.JobCardTimeLogs.AsNoTracking()
-            .Where(x => x.JobTaskId == jobTaskId && !x.IsDeleted)
-            .OrderByDescending(x => x.StartAt)
-            .Select(x => new TimeLogResponse(x.Id, x.JobCardId, x.TechnicianUserId, x.StartAt, x.EndAt, x.TotalMinutes))
-            .ToListAsync(ct);
+        return await (from log in _db.JobCardTimeLogs.Where(x => x.JobTaskId == jobTaskId && !x.IsDeleted)
+                      join tech in _db.Users on log.TechnicianUserId equals tech.Id
+                      join task in _db.JobTasks on log.JobTaskId equals task.Id
+                      join ws in _db.WorkStations on new { Code = task.StationCode, BranchId = branchId } equals new { ws.Code, ws.BranchId } into wsGroup
+                      from ws in wsGroup.DefaultIfEmpty()
+                      orderby log.StartAt descending
+                      select new TimeLogResponse(
+                          log.Id, log.JobCardId, log.TechnicianUserId, log.StartAt, log.EndAt, log.TotalMinutes,
+                          tech.Email, task.Title, ws.Name
+                      )).ToListAsync(ct);
+    }
+
+    private async Task<TimeLogResponse> GetByIdInternalAsync(Guid branchId, Guid logId, CancellationToken ct)
+    {
+        var logEntry = await (from log in _db.JobCardTimeLogs.Where(x => x.Id == logId && !x.IsDeleted)
+                              join tech in _db.Users on log.TechnicianUserId equals tech.Id
+                              join task in _db.JobTasks on log.JobTaskId equals task.Id
+                              join ws in _db.WorkStations on new { Code = task.StationCode, BranchId = branchId } equals new { ws.Code, ws.BranchId } into wsGroup
+                              from ws in wsGroup.DefaultIfEmpty()
+                              select new TimeLogResponse(
+                                  log.Id, log.JobCardId, log.TechnicianUserId, log.StartAt, log.EndAt, log.TotalMinutes,
+                                  tech.Email, task.Title, ws.Name
+                              )).FirstOrDefaultAsync(ct);
+
+        return logEntry ?? throw new NotFoundException("Time log not found");
     }
 
     private static TimeLogResponse Map(Domain.Entities.JobCardTimeLog x) =>

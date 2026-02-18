@@ -18,4 +18,6 @@ public sealed record ApprovalResponse(
     Guid ApprovedByUserId,
     DateTimeOffset ApprovedAt,
     string? Note,
-    ApprovalStatus Status);
+    ApprovalStatus Status,
+    string? RequestedByEmail = null,
+    string? ApprovedByEmail = null);

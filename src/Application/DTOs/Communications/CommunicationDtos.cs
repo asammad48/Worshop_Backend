@@ -16,4 +16,6 @@ public sealed record CommunicationLogResponse(
     CommunicationMessageType MessageType,
     DateTimeOffset SentAt,
     string? Notes,
-    Guid SentByUserId);
+    Guid SentByUserId,
+    string? CreatedByEmail = null,
+    string? JobCardPlate = null);

@@ -36,7 +36,8 @@ public sealed class JobCardPartsService : IJobCardPartsService
             QuantityUsed = req.QuantityUsed,
             UnitPrice = req.UnitPrice,
             UsedAt = DateTimeOffset.UtcNow,
-            PerformedByUserId = actorUserId
+            PerformedByUserId = actorUserId,
+            CreatedBy = actorUserId
         };
         _db.JobCardPartUsages.Add(usage);
 
@@ -58,7 +59,7 @@ public sealed class JobCardPartsService : IJobCardPartsService
         await _db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
 
-        return new JobCardPartUsageResponse(usage.Id, usage.JobCardId, usage.LocationId, usage.PartId, usage.QuantityUsed, usage.UnitPrice, usage.UsedAt, usage.PerformedByUserId);
+        return await GetByIdInternalAsync(usage.Id, ct);
     }
 
     public async Task<IReadOnlyList<JobCardPartUsageResponse>> ListAsync(Guid branchId, Guid jobCardId, CancellationToken ct = default)
@@ -66,10 +67,26 @@ public sealed class JobCardPartsService : IJobCardPartsService
         var jobExists = await _db.JobCards.AnyAsync(x => x.Id == jobCardId && x.BranchId == branchId && !x.IsDeleted, ct);
         if (!jobExists) throw new NotFoundException("Job card not found");
 
-        return await _db.JobCardPartUsages.AsNoTracking()
-            .Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
-            .OrderByDescending(x => x.UsedAt)
-            .Select(x => new JobCardPartUsageResponse(x.Id, x.JobCardId, x.LocationId, x.PartId, x.QuantityUsed, x.UnitPrice, x.UsedAt, x.PerformedByUserId))
-            .ToListAsync(ct);
+        return await (from u in _db.JobCardPartUsages.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+                      join part in _db.Parts on u.PartId equals part.Id
+                      join loc in _db.Locations on u.LocationId equals loc.Id
+                      orderby u.UsedAt descending
+                      select new JobCardPartUsageResponse(
+                          u.Id, u.JobCardId, u.LocationId, u.PartId, u.QuantityUsed, u.UnitPrice, u.UsedAt, u.PerformedByUserId,
+                          part.Sku, part.Name, loc.Code, loc.Name
+                      )).ToListAsync(ct);
+    }
+
+    private async Task<JobCardPartUsageResponse> GetByIdInternalAsync(Guid id, CancellationToken ct)
+    {
+        var usage = await (from u in _db.JobCardPartUsages.Where(x => x.Id == id && !x.IsDeleted)
+                           join part in _db.Parts on u.PartId equals part.Id
+                           join loc in _db.Locations on u.LocationId equals loc.Id
+                           select new JobCardPartUsageResponse(
+                               u.Id, u.JobCardId, u.LocationId, u.PartId, u.QuantityUsed, u.UnitPrice, u.UsedAt, u.PerformedByUserId,
+                               part.Sku, part.Name, loc.Code, loc.Name
+                           )).FirstOrDefaultAsync(ct);
+
+        return usage ?? throw new NotFoundException("Part usage not found");
     }
 }

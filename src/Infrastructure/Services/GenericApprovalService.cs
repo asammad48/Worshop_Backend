@@ -69,16 +69,36 @@ public sealed class GenericApprovalService : IGenericApprovalService
 
         await _db.SaveChangesAsync(ct);
 
-        return Map(approval);
+        return await GetByIdInternalAsync(approval.Id, ct);
     }
 
     public async Task<IReadOnlyList<ApprovalResponse>> ListAsync(Guid branchId, string targetType, Guid targetId, CancellationToken ct = default)
     {
-        return await _db.Approvals.AsNoTracking()
-            .Where(x => x.BranchId == branchId && x.TargetType == targetType.ToUpperInvariant() && x.TargetId == targetId && !x.IsDeleted)
-            .OrderByDescending(x => x.ApprovedAt)
-            .Select(x => new ApprovalResponse(x.Id, x.BranchId, x.TargetType, x.TargetId, x.ApprovalType, x.ApprovedByUserId, x.ApprovedAt, x.Note, x.Status))
-            .ToListAsync(ct);
+        return await (from a in _db.Approvals.Where(x => x.BranchId == branchId && x.TargetType == targetType.ToUpperInvariant() && x.TargetId == targetId && !x.IsDeleted)
+                      join requester in _db.Users on a.CreatedBy equals requester.Id into requesterGroup
+                      from requester in requesterGroup.DefaultIfEmpty()
+                      join approver in _db.Users on a.ApprovedByUserId equals approver.Id into approverGroup
+                      from approver in approverGroup.DefaultIfEmpty()
+                      orderby a.ApprovedAt descending
+                      select new ApprovalResponse(
+                          a.Id, a.BranchId, a.TargetType, a.TargetId, a.ApprovalType, a.ApprovedByUserId, a.ApprovedAt, a.Note, a.Status,
+                          requester.Email, approver.Email
+                      )).ToListAsync(ct);
+    }
+
+    private async Task<ApprovalResponse> GetByIdInternalAsync(Guid id, CancellationToken ct)
+    {
+        var approval = await (from a in _db.Approvals.Where(x => x.Id == id && !x.IsDeleted)
+                              join requester in _db.Users on a.CreatedBy equals requester.Id into requesterGroup
+                              from requester in requesterGroup.DefaultIfEmpty()
+                              join approver in _db.Users on a.ApprovedByUserId equals approver.Id into approverGroup
+                              from approver in approverGroup.DefaultIfEmpty()
+                              select new ApprovalResponse(
+                                  a.Id, a.BranchId, a.TargetType, a.TargetId, a.ApprovalType, a.ApprovedByUserId, a.ApprovedAt, a.Note, a.Status,
+                                  requester.Email, approver.Email
+                              )).FirstOrDefaultAsync(ct);
+
+        return approval ?? throw new NotFoundException("Approval not found");
     }
 
     private static ApprovalResponse Map(Approval x)

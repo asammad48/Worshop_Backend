@@ -36,7 +36,7 @@ public sealed class CommunicationService : ICommunicationService
         _db.CommunicationLogs.Add(log);
         await _db.SaveChangesAsync(ct);
 
-        return Map(log);
+        return await GetByIdInternalAsync(log.Id, ct);
     }
 
     public async Task<IReadOnlyList<CommunicationLogResponse>> ListByJobCardAsync(Guid branchId, Guid jobCardId, CancellationToken ct = default)
@@ -44,11 +44,29 @@ public sealed class CommunicationService : ICommunicationService
         var jobExists = await _db.JobCards.AnyAsync(x => x.Id == jobCardId && x.BranchId == branchId && !x.IsDeleted, ct);
         if (!jobExists) throw new NotFoundException("Job card not found");
 
-        return await _db.CommunicationLogs.AsNoTracking()
-            .Where(x => x.JobCardId == jobCardId && x.BranchId == branchId && !x.IsDeleted)
-            .OrderByDescending(x => x.SentAt)
-            .Select(x => new CommunicationLogResponse(x.Id, x.BranchId, x.JobCardId, x.Channel, x.MessageType, x.SentAt, x.Notes, x.SentByUserId))
-            .ToListAsync(ct);
+        return await (from log in _db.CommunicationLogs.Where(x => x.JobCardId == jobCardId && x.BranchId == branchId && !x.IsDeleted)
+                      join user in _db.Users on log.SentByUserId equals user.Id
+                      join job in _db.JobCards on log.JobCardId equals job.Id
+                      join vehicle in _db.Vehicles on job.VehicleId equals vehicle.Id
+                      orderby log.SentAt descending
+                      select new CommunicationLogResponse(
+                          log.Id, log.BranchId, log.JobCardId, log.Channel, log.MessageType, log.SentAt, log.Notes, log.SentByUserId,
+                          user.Email, vehicle.Plate
+                      )).ToListAsync(ct);
+    }
+
+    private async Task<CommunicationLogResponse> GetByIdInternalAsync(Guid logId, CancellationToken ct)
+    {
+        var logEntry = await (from log in _db.CommunicationLogs.Where(x => x.Id == logId && !x.IsDeleted)
+                              join user in _db.Users on log.SentByUserId equals user.Id
+                              join job in _db.JobCards on log.JobCardId equals job.Id
+                              join vehicle in _db.Vehicles on job.VehicleId equals vehicle.Id
+                              select new CommunicationLogResponse(
+                                  log.Id, log.BranchId, log.JobCardId, log.Channel, log.MessageType, log.SentAt, log.Notes, log.SentByUserId,
+                                  user.Email, vehicle.Plate
+                              )).FirstOrDefaultAsync(ct);
+
+        return logEntry ?? throw new NotFoundException("Communication log not found");
     }
 
     private static CommunicationLogResponse Map(CommunicationLog x)

@@ -18,5 +18,10 @@ public record JobPartRequestResponse(
     Guid? OfficeSignedByUserId,
     JobPartRequestStatus Status,
     Guid? SupplierId,
-    Guid? PurchaseOrderId
+    Guid? PurchaseOrderId,
+    string? PartSku = null,
+    string? PartName = null,
+    string? SupplierName = null,
+    string? RequestedByEmail = null,
+    string? WorkStationName = null
 );

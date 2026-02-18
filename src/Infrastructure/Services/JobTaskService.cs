@@ -31,7 +31,7 @@ public sealed class JobTaskService : IJobTaskService
         _db.JobTasks.Add(task);
         await _db.SaveChangesAsync(ct);
 
-        return Map(task);
+        return await GetByIdInternalAsync(branchId, task.Id, ct);
     }
 
     public async Task<JobTaskResponse> StartAsync(Guid actorUserId, Guid branchId, Guid taskId, CancellationToken ct = default)
@@ -53,7 +53,7 @@ public sealed class JobTaskService : IJobTaskService
 
         await _db.SaveChangesAsync(ct);
 
-        return Map(task);
+        return await GetByIdInternalAsync(branchId, taskId, ct);
     }
 
     public async Task<JobTaskResponse> StopAsync(Guid actorUserId, Guid branchId, Guid taskId, CancellationToken ct = default)
@@ -80,7 +80,7 @@ public sealed class JobTaskService : IJobTaskService
 
         await _db.SaveChangesAsync(ct);
 
-        return Map(task);
+        return await GetByIdInternalAsync(branchId, taskId, ct);
     }
 
     public async Task<IReadOnlyList<JobTaskResponse>> ListByJobCardAsync(Guid branchId, Guid jobCardId, CancellationToken ct = default)
@@ -88,11 +88,39 @@ public sealed class JobTaskService : IJobTaskService
         var jobExists = await _db.JobCards.AnyAsync(x => x.Id == jobCardId && x.BranchId == branchId && !x.IsDeleted, ct);
         if (!jobExists) throw new NotFoundException("Job card not found");
 
-        return await _db.JobTasks.AsNoTracking()
-            .Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
-            .OrderBy(x => x.CreatedAt)
-            .Select(x => new JobTaskResponse(x.Id, x.JobCardId, x.StationCode, x.Title, x.StartedAt, x.EndedAt, x.StartedByUserId, x.EndedByUserId, x.TotalMinutes, x.Notes, x.Status, x.CreatedAt, x.UpdatedAt))
-            .ToListAsync(ct);
+        return await (from t in _db.JobTasks.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+                      join ws in _db.WorkStations on new { Code = t.StationCode, BranchId = branchId } equals new { ws.Code, ws.BranchId } into wsGroup
+                      from ws in wsGroup.DefaultIfEmpty()
+                      join job in _db.JobCards on t.JobCardId equals job.Id
+                      join vehicle in _db.Vehicles on job.VehicleId equals vehicle.Id
+                      join creator in _db.Users on t.CreatedBy equals creator.Id into creatorGroup
+                      from creator in creatorGroup.DefaultIfEmpty()
+                      join starter in _db.Users on t.StartedByUserId equals starter.Id into starterGroup
+                      from starter in starterGroup.DefaultIfEmpty()
+                      orderby t.CreatedAt
+                      select new JobTaskResponse(
+                          t.Id, t.JobCardId, t.StationCode, t.Title, t.StartedAt, t.EndedAt, t.StartedByUserId, t.EndedByUserId, t.TotalMinutes, t.Notes, t.Status, t.CreatedAt, t.UpdatedAt,
+                          ws.Name, ws.Code, starter.Email, creator.Email, vehicle.Plate
+                      )).ToListAsync(ct);
+    }
+
+    private async Task<JobTaskResponse> GetByIdInternalAsync(Guid branchId, Guid taskId, CancellationToken ct)
+    {
+        var task = await (from t in _db.JobTasks.Where(x => x.Id == taskId && !x.IsDeleted)
+                          join ws in _db.WorkStations on new { Code = t.StationCode, BranchId = branchId } equals new { ws.Code, ws.BranchId } into wsGroup
+                          from ws in wsGroup.DefaultIfEmpty()
+                          join job in _db.JobCards on t.JobCardId equals job.Id
+                          join vehicle in _db.Vehicles on job.VehicleId equals vehicle.Id
+                          join creator in _db.Users on t.CreatedBy equals creator.Id into creatorGroup
+                          from creator in creatorGroup.DefaultIfEmpty()
+                          join starter in _db.Users on t.StartedByUserId equals starter.Id into starterGroup
+                          from starter in starterGroup.DefaultIfEmpty()
+                          select new JobTaskResponse(
+                              t.Id, t.JobCardId, t.StationCode, t.Title, t.StartedAt, t.EndedAt, t.StartedByUserId, t.EndedByUserId, t.TotalMinutes, t.Notes, t.Status, t.CreatedAt, t.UpdatedAt,
+                              ws.Name, ws.Code, starter.Email, creator.Email, vehicle.Plate
+                          )).FirstOrDefaultAsync(ct);
+
+        return task ?? throw new NotFoundException("Task not found");
     }
 
     private static JobTaskResponse Map(JobTask x)

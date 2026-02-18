@@ -15,4 +15,9 @@ public sealed record JobTaskResponse(
     string? Notes,
     JobTaskStatus Status,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? WorkStationName = null,
+    string? WorkStationCode = null,
+    string? AssignedToEmail = null,
+    string? CreatedByEmail = null,
+    string? JobCardPlate = null);

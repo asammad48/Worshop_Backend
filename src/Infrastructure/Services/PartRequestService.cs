@@ -33,13 +33,14 @@ public sealed class PartRequestService : IPartRequestService
             Qty = r.Qty,
             StationCode = r.StationCode,
             Status = JobPartRequestStatus.Requested,
-            RequestedAt = DateTimeOffset.UtcNow
+            RequestedAt = DateTimeOffset.UtcNow,
+            CreatedBy = actorUserId
         };
 
         _db.JobPartRequests.Add(request);
         await _db.SaveChangesAsync(ct);
 
-        return Map(request);
+        return await GetByIdInternalAsync(branchId, request.Id, ct);
     }
 
     public async Task<JobPartRequestResponse> MarkOrderedAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default)
@@ -52,7 +53,7 @@ public sealed class PartRequestService : IPartRequestService
         request.OrderedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
-        return Map(request);
+        return await GetByIdInternalAsync(branchId, id, ct);
     }
 
     public async Task<JobPartRequestResponse> MarkArrivedAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default)
@@ -65,7 +66,7 @@ public sealed class PartRequestService : IPartRequestService
         request.ArrivedAt = DateTimeOffset.UtcNow;
 
         await _db.SaveChangesAsync(ct);
-        return Map(request);
+        return await GetByIdInternalAsync(branchId, id, ct);
     }
 
     public async Task<JobPartRequestResponse> StationSignAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default)
@@ -74,7 +75,7 @@ public sealed class PartRequestService : IPartRequestService
         request.StationSignedByUserId = actorUserId;
 
         await _db.SaveChangesAsync(ct);
-        return Map(request);
+        return await GetByIdInternalAsync(branchId, id, ct);
     }
 
     public async Task<JobPartRequestResponse> OfficeSignAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default)
@@ -83,18 +84,44 @@ public sealed class PartRequestService : IPartRequestService
         request.OfficeSignedByUserId = actorUserId;
 
         await _db.SaveChangesAsync(ct);
-        return Map(request);
+        return await GetByIdInternalAsync(branchId, id, ct);
     }
 
     public async Task<IReadOnlyList<JobPartRequestResponse>> ListForJobCardAsync(Guid branchId, Guid jobCardId, CancellationToken ct = default)
     {
-        var requests = await _db.JobPartRequests
-            .AsNoTracking()
-            .Where(x => x.JobCardId == jobCardId && x.BranchId == branchId && !x.IsDeleted)
-            .OrderByDescending(x => x.RequestedAt)
-            .ToListAsync(ct);
+        return await (from r in _db.JobPartRequests.Where(x => x.JobCardId == jobCardId && x.BranchId == branchId && !x.IsDeleted)
+                      join part in _db.Parts on r.PartId equals part.Id
+                      join supplier in _db.Suppliers on r.SupplierId equals supplier.Id into supplierGroup
+                      from supplier in supplierGroup.DefaultIfEmpty()
+                      join user in _db.Users on r.CreatedBy equals user.Id into userGroup
+                      from user in userGroup.DefaultIfEmpty()
+                      join ws in _db.WorkStations on new { Code = r.StationCode, BranchId = branchId } equals new { ws.Code, ws.BranchId } into wsGroup
+                      from ws in wsGroup.DefaultIfEmpty()
+                      orderby r.RequestedAt descending
+                      select new JobPartRequestResponse(
+                          r.Id, r.BranchId, r.JobCardId, r.PartId, r.Qty, r.StationCode, r.RequestedAt, r.OrderedAt, r.ArrivedAt,
+                          r.StationSignedByUserId, r.OfficeSignedByUserId, r.Status, r.SupplierId, r.PurchaseOrderId,
+                          part.Sku, part.Name, supplier.Name, user.Email, ws.Name
+                      )).ToListAsync(ct);
+    }
 
-        return requests.Select(Map).ToList();
+    private async Task<JobPartRequestResponse> GetByIdInternalAsync(Guid branchId, Guid id, CancellationToken ct)
+    {
+        var response = await (from r in _db.JobPartRequests.Where(x => x.Id == id && x.BranchId == branchId && !x.IsDeleted)
+                              join part in _db.Parts on r.PartId equals part.Id
+                              join supplier in _db.Suppliers on r.SupplierId equals supplier.Id into supplierGroup
+                              from supplier in supplierGroup.DefaultIfEmpty()
+                              join user in _db.Users on r.CreatedBy equals user.Id into userGroup
+                              from user in userGroup.DefaultIfEmpty()
+                              join ws in _db.WorkStations on new { Code = r.StationCode, BranchId = branchId } equals new { ws.Code, ws.BranchId } into wsGroup
+                              from ws in wsGroup.DefaultIfEmpty()
+                              select new JobPartRequestResponse(
+                                  r.Id, r.BranchId, r.JobCardId, r.PartId, r.Qty, r.StationCode, r.RequestedAt, r.OrderedAt, r.ArrivedAt,
+                                  r.StationSignedByUserId, r.OfficeSignedByUserId, r.Status, r.SupplierId, r.PurchaseOrderId,
+                                  part.Sku, part.Name, supplier.Name, user.Email, ws.Name
+                              )).FirstOrDefaultAsync(ct);
+
+        return response ?? throw new NotFoundException("Part request not found");
     }
 
     private async Task<JobPartRequest> Load(Guid branchId, Guid id, CancellationToken ct)
