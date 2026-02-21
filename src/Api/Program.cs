@@ -2,6 +2,7 @@ using System.Text;
 using Application.Services.Interfaces;
 using Infrastructure.Auth;
 using Infrastructure.Persistence;
+using Infrastructure.Persistence.Repositories;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -48,6 +49,9 @@ builder.Services.AddScoped<IJobTaskService, JobTaskService>();
 builder.Services.AddScoped<IGenericApprovalService, GenericApprovalService>();
 builder.Services.AddScoped<ICommunicationService, CommunicationService>();
 builder.Services.AddScoped<IAttachmentService, AttachmentService>();
+builder.Services.AddScoped<IAttendanceService, AttendanceService>();
+builder.Services.AddScoped<IAttendanceRepository, AttendanceRepository>();
+builder.Services.AddScoped<IFileStorage, LocalFileStorage>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 
 // Auth

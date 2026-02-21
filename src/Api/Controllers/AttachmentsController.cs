@@ -8,7 +8,7 @@ using Shared.Api;
 namespace Api.Controllers;
 
 [ApiController]
-[Route("api/v1/attachments")]
+[Route("api/v1/[controller]")]
 [Authorize(Policy = "BranchUser")]
 public sealed class AttachmentsController : ControllerBase
 {
@@ -30,11 +30,29 @@ public sealed class AttachmentsController : ControllerBase
         return ApiResponse<IReadOnlyList<AttachmentResponse>>.Ok(await _svc.ListAsync(branchId, ownerType, ownerId, ct));
     }
 
-    [HttpPost("presign")]
-    public async Task<ActionResult<ApiResponse<PresignResponse>>> Presign([FromBody] PresignRequest req, CancellationToken ct)
+    [HttpPost("upload")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<ApiResponse<AttachmentResponse>>> Upload(
+        [FromForm] string ownerType,
+        [FromForm] Guid ownerId,
+        [FromForm] string? note,
+        IFormFile file,
+        CancellationToken ct)
     {
-        var branchId = User.GetBranchIdOrThrow();
         var userId = User.GetUserId();
-        return ApiResponse<PresignResponse>.Ok(await _svc.PresignAsync(userId, branchId, req, ct));
+        Guid? branchId = null;
+        var branchClaim = User.FindFirst("branchId")?.Value;
+        if (branchClaim != null && Guid.TryParse(branchClaim, out var bId)) branchId = bId;
+
+        using var stream = file.OpenReadStream();
+        var result = await _svc.UploadAsync(userId, branchId, ownerType, ownerId, note, file.FileName, file.ContentType, file.Length, stream, ct);
+        return ApiResponse<AttachmentResponse>.Ok(result);
+    }
+
+    [HttpGet("{id}/download")]
+    public async Task<IActionResult> Download(Guid id, CancellationToken ct)
+    {
+        var (stream, fileName, contentType) = await _svc.DownloadAsync(id, ct);
+        return File(stream, contentType, fileName);
     }
 }
