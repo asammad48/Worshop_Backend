@@ -37,4 +37,19 @@ public sealed class AttachmentsController : ControllerBase
         var userId = User.GetUserId();
         return ApiResponse<PresignResponse>.Ok(await _svc.PresignAsync(userId, branchId, req, ct));
     }
+
+    [HttpPost("upload")]
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult<ApiResponse<AttachmentUploadResponse>>> Upload(
+        [FromForm] string ownerType,
+        [FromForm] Guid ownerId,
+        [FromForm] string? note,
+        IFormFile file,
+        CancellationToken ct)
+    {
+        var userId = User.GetUserId();
+        using var stream = file.OpenReadStream();
+        var res = await _svc.UploadAsync(userId, ownerType, ownerId, note, stream, file.FileName, file.ContentType, ct);
+        return Ok(ApiResponse<AttachmentUploadResponse>.Ok(res));
+    }
 }

@@ -19,5 +19,12 @@ public static class ClaimsExtensions
         return id;
     }
 
+    public static Guid? GetBranchId(this ClaimsPrincipal user)
+    {
+        var b = user.FindFirstValue("branchId");
+        if (b is null || !Guid.TryParse(b, out var id)) return null;
+        return id;
+    }
+
     public static string GetRole(this ClaimsPrincipal user) => user.FindFirstValue("role") ?? "";
 }

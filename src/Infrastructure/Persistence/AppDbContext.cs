@@ -34,6 +34,9 @@ public sealed class AppDbContext : DbContext
     public DbSet<JobLineItem> JobLineItems => Set<JobLineItem>();
     public DbSet<Expense> Expenses => Set<Expense>();
     public DbSet<EmployeeProfile> EmployeeProfiles => Set<EmployeeProfile>();
+    public DbSet<UserWage> UserWages => Set<UserWage>();
+    public DbSet<AttendanceEvent> AttendanceEvents => Set<AttendanceEvent>();
+    public DbSet<InvoiceRecomputeJob> InvoiceRecomputeJobs => Set<InvoiceRecomputeJob>();
     public DbSet<WagePayment> WagePayments => Set<WagePayment>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -195,6 +198,9 @@ public sealed class AppDbContext : DbContext
             i.Property(x => x.Discount).HasColumnName("discount").HasColumnType("numeric(12,2)");
             i.Property(x => x.Tax).HasColumnName("tax").HasColumnType("numeric(12,2)");
             i.Property(x => x.Total).HasColumnName("total").HasColumnType("numeric(12,2)");
+            i.Property(x => x.LaborMinutes).HasColumnName("labor_minutes").HasDefaultValue(0);
+            i.Property(x => x.LaborAmount).HasColumnName("labor_amount").HasColumnType("numeric(18,2)").HasDefaultValue(0);
+            i.Property(x => x.LaborRatePerHour).HasColumnName("labor_rate_per_hour").HasColumnType("numeric(18,2)").HasDefaultValue(0);
             i.Property(x => x.PaymentStatus).HasColumnName("payment_status").HasConversion<short>().IsRequired();
             i.HasIndex(x => x.JobCardId).IsUnique().HasDatabaseName("uq_invoice_jobcard");
             i.HasOne(x => x.JobCard).WithMany().HasForeignKey(x => x.JobCardId).OnDelete(DeleteBehavior.Cascade);
@@ -423,6 +429,49 @@ public sealed class AppDbContext : DbContext
             a.Property(x => x.Provider).HasColumnName("provider").HasConversion<short>().HasDefaultValue(StorageProvider.Local);
             a.Property(x => x.UploadedAt).HasColumnName("uploaded_at").HasDefaultValueSql("now()");
             a.Property(x => x.UploadedByUserId).HasColumnName("uploaded_by_user_id").IsRequired();
+            a.Property(x => x.Note).HasColumnName("note");
+            a.HasIndex(x => new { x.OwnerType, x.OwnerId }).HasDatabaseName("idx_attachments_owner");
+        });
+
+        modelBuilder.Entity<UserWage>(uw =>
+        {
+            uw.ToTable("user_wages");
+            uw.HasKey(x => x.Id);
+            Base(uw);
+            uw.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+            uw.Property(x => x.HourlyRate).HasColumnName("hourly_rate").HasColumnType("numeric(18,2)").IsRequired();
+            uw.Property(x => x.Currency).HasColumnName("currency").HasMaxLength(3).HasDefaultValue("PKR").IsRequired();
+            uw.Property(x => x.EffectiveFrom).HasColumnName("effective_from");
+            uw.Property(x => x.EffectiveTo).HasColumnName("effective_to");
+            uw.HasIndex(x => x.UserId).HasDatabaseName("idx_user_wages_user_id");
+            uw.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AttendanceEvent>(ae =>
+        {
+            ae.ToTable("attendance_events");
+            ae.HasKey(x => x.Id);
+            Base(ae);
+            ae.Property(x => x.UserId).HasColumnName("user_id").IsRequired();
+            ae.Property(x => x.BranchId).HasColumnName("branch_id");
+            ae.Property(x => x.EventType).HasColumnName("event_type").HasConversion<short>().IsRequired();
+            ae.Property(x => x.OccurredAt).HasColumnName("occurred_at").IsRequired();
+            ae.Property(x => x.Note).HasColumnName("note");
+            ae.HasIndex(x => new { x.UserId, x.OccurredAt }).HasDatabaseName("idx_attendance_user_date");
+            ae.HasIndex(x => new { x.BranchId, x.OccurredAt }).HasDatabaseName("idx_attendance_branch_date");
+            ae.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<InvoiceRecomputeJob>(rj =>
+        {
+            rj.ToTable("invoice_recompute_jobs");
+            rj.HasKey(x => x.Id);
+            Base(rj);
+            rj.Property(x => x.JobCardId).HasColumnName("job_card_id").IsRequired();
+            rj.Property(x => x.Reason).HasColumnName("reason");
+            rj.Property(x => x.Status).HasColumnName("status").HasMaxLength(20).IsRequired();
+            rj.Property(x => x.Attempts).HasColumnName("attempts").HasDefaultValue(0);
+            rj.Property(x => x.LastError).HasColumnName("last_error");
         });
 
         modelBuilder.Entity<AuditLog>(a =>

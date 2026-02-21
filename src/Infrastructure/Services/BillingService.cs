@@ -177,7 +177,7 @@ public sealed class BillingService : IBillingService
     }
 
     private static InvoiceResponse Map(Domain.Entities.Invoice x) =>
-        new(x.Id, x.JobCardId, x.Subtotal, x.Discount, x.Tax, x.Total, x.PaymentStatus);
+        new(x.Id, x.JobCardId, x.Subtotal, x.Discount, x.Tax, x.Total, x.PaymentStatus, x.LaborMinutes, x.LaborRatePerHour, x.LaborAmount);
 
     private static JobLineItemResponse MapLine(Domain.Entities.JobLineItem x) =>
         new(x.Id, x.JobCardId, x.Type, x.Title, x.Qty, x.UnitPrice, x.Total, x.Notes, x.PartId, x.JobPartRequestId);

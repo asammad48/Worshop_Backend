@@ -101,6 +101,50 @@ public sealed class AttachmentService : IAttachmentService
         return await Task.FromResult(new PresignResponse(dummyUrl, storageKey, StorageProvider.Local));
     }
 
+    public async Task<AttachmentUploadResponse> UploadAsync(Guid actorUserId, string ownerType, Guid ownerId, string? note, Stream fileStream, string fileName, string contentType, CancellationToken ct = default)
+    {
+        var ot = (ownerType ?? "UNKNOWN").Trim().ToUpperInvariant();
+        var safeFileName = Path.GetFileName(fileName);
+        var subPath = Path.Combine("storage", ot, ownerId.ToString());
+        var fileNameWithGuid = $"{Guid.NewGuid()}_{safeFileName}";
+        var storageKey = Path.Combine(subPath, fileNameWithGuid).Replace('\\', '/');
+
+        var fullPath = Path.Combine(Directory.GetCurrentDirectory(), storageKey);
+        var directory = Path.GetDirectoryName(fullPath);
+        if (directory != null && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        long sizeBytes;
+        using (var fs = new FileStream(fullPath, FileMode.Create))
+        {
+            await fileStream.CopyToAsync(fs, ct);
+            sizeBytes = fs.Length;
+        }
+
+        var a = new Domain.Entities.Attachment
+        {
+            OwnerType = ot,
+            OwnerId = ownerId,
+            FileName = safeFileName,
+            ContentType = contentType,
+            SizeBytes = sizeBytes,
+            StorageKey = storageKey,
+            Provider = StorageProvider.Local,
+            UploadedAt = DateTimeOffset.UtcNow,
+            UploadedByUserId = actorUserId,
+            Note = note?.Trim()
+        };
+
+        _db.Attachments.Add(a);
+        await _db.SaveChangesAsync(ct);
+
+        var url = $"/{storageKey}";
+
+        return new AttachmentUploadResponse(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.Note, url, a.CreatedAt);
+    }
+
     private static AttachmentResponse Map(Domain.Entities.Attachment x)
         => new(x.Id, x.OwnerType, x.OwnerId, x.FileName, x.ContentType, x.SizeBytes, x.StorageKey, x.Provider, x.UploadedAt, x.UploadedByUserId);
 

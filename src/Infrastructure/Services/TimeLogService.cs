@@ -10,9 +10,14 @@ namespace Infrastructure.Services;
 public sealed class TimeLogService : ITimeLogService
 {
     private readonly AppDbContext _db;
-    public TimeLogService(AppDbContext db) { _db = db; }
+    private readonly IInvoiceRecomputeQueue _recomputeQueue;
+    public TimeLogService(AppDbContext db, IInvoiceRecomputeQueue recomputeQueue)
+    {
+        _db = db;
+        _recomputeQueue = recomputeQueue;
+    }
 
-    public async Task<TimeLogResponse> StartAsync(Guid actorUserId, Guid branchId, Guid jobCardId, Guid technicianUserId,Guid jobTaskId, CancellationToken ct = default)
+    public async Task<TimeLogResponse> StartAsync(Guid actorUserId, Guid branchId, Guid jobCardId, Guid technicianUserId, Guid jobTaskId, CancellationToken ct = default)
     {
         var jobTaskExists = await _db.JobTasks.AnyAsync(x => x.Id == jobTaskId && !x.IsDeleted, ct);
         if (!jobTaskExists) throw new NotFoundException("Job task not found");
@@ -34,6 +39,9 @@ public sealed class TimeLogService : ITimeLogService
         };
         _db.JobCardTimeLogs.Add(entity);
         await _db.SaveChangesAsync(ct);
+
+        await _recomputeQueue.EnqueueAsync(jobCardId, "Timelog started", ct);
+
         return await GetByIdInternalAsync(branchId, entity.Id, ct);
     }
 
@@ -50,6 +58,9 @@ public sealed class TimeLogService : ITimeLogService
         log.EndAt = DateTimeOffset.UtcNow;
         log.TotalMinutes = (int)Math.Max(0, (log.EndAt.Value - log.StartAt).TotalMinutes);
         await _db.SaveChangesAsync(ct);
+
+        await _recomputeQueue.EnqueueAsync(jobCardId, "Timelog stopped", ct);
+
         return await GetByIdInternalAsync(branchId, log.Id, ct);
     }
 

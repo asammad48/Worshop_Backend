@@ -13,4 +13,5 @@ public sealed class Attachment : BaseEntity
     public StorageProvider Provider { get; set; } = StorageProvider.Local;
     public DateTimeOffset UploadedAt { get; set; }
     public Guid UploadedByUserId { get; set; }
+    public string? Note { get; set; }
 }

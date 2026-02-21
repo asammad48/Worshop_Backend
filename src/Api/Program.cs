@@ -34,6 +34,11 @@ builder.Services.AddScoped<IWorkStationService, WorkStationService>();
 builder.Services.AddScoped<IApprovalService, ApprovalService>();
 builder.Services.AddScoped<ITimeLogService, TimeLogService>();
 builder.Services.AddScoped<IBillingService, BillingService>();
+builder.Services.AddScoped<IUserWageService, UserWageService>();
+builder.Services.AddScoped<IAttendanceService, AttendanceService>();
+builder.Services.AddScoped<IInvoiceComputationService, InvoiceComputationService>();
+builder.Services.AddScoped<IInvoiceRecomputeQueue, InvoiceRecomputeQueue>();
+builder.Services.AddHostedService<InvoiceRecomputeWorker>();
 
 builder.Services.AddScoped<IInventoryService, InventoryService>();
 builder.Services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();

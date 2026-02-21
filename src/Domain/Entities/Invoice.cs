@@ -11,5 +11,9 @@ public sealed class Invoice : BaseEntity
     public decimal Tax { get; set; }
     public decimal Total { get; set; }
 
+    public int LaborMinutes { get; set; }
+    public decimal LaborAmount { get; set; }
+    public decimal LaborRatePerHour { get; set; }
+
     public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Pending;
 }
