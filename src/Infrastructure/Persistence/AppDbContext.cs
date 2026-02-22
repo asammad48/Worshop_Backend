@@ -36,6 +36,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<EmployeeProfile> EmployeeProfiles => Set<EmployeeProfile>();
     public DbSet<WagePayment> WagePayments => Set<WagePayment>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
+    public DbSet<AttendanceRecord> AttendanceRecords => Set<AttendanceRecord>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Roadblocker> Roadblockers => Set<Roadblocker>();
     public DbSet<JobTask> JobTasks => Set<JobTask>();
@@ -421,8 +422,30 @@ public sealed class AppDbContext : DbContext
             a.Property(x => x.SizeBytes).HasColumnName("size_bytes").IsRequired();
             a.Property(x => x.StorageKey).HasColumnName("storage_key").IsRequired();
             a.Property(x => x.Provider).HasColumnName("provider").HasConversion<short>().HasDefaultValue(StorageProvider.Local);
+            a.Property(x => x.Note).HasColumnName("note");
             a.Property(x => x.UploadedAt).HasColumnName("uploaded_at").HasDefaultValueSql("now()");
             a.Property(x => x.UploadedByUserId).HasColumnName("uploaded_by_user_id").IsRequired();
+        });
+
+        modelBuilder.Entity<AttendanceRecord>(a =>
+        {
+            a.ToTable("attendance_records");
+            a.HasKey(x => x.Id);
+            Base(a);
+            a.Property(x => x.BranchId).HasColumnName("branch_id");
+            a.Property(x => x.EmployeeUserId).HasColumnName("employee_user_id").IsRequired();
+            a.Property(x => x.WorkDate).HasColumnName("work_date").IsRequired();
+            a.Property(x => x.CheckInAt).HasColumnName("check_in_at");
+            a.Property(x => x.CheckOutAt).HasColumnName("check_out_at");
+            a.Property(x => x.Status).HasColumnName("status").HasConversion<short>().IsRequired().HasDefaultValue(AttendanceStatus.Present);
+            a.Property(x => x.Source).HasColumnName("source").HasConversion<short>().IsRequired();
+            a.Property(x => x.Note).HasColumnName("note");
+
+            a.HasIndex(x => new { x.EmployeeUserId, x.WorkDate }).IsUnique().HasDatabaseName("uq_attendance_employee_date");
+            a.HasIndex(x => new { x.BranchId, x.WorkDate }).HasDatabaseName("ix_attendance_branch_date");
+
+            a.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+            a.HasOne(x => x.EmployeeUser).WithMany().HasForeignKey(x => x.EmployeeUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<AuditLog>(a =>

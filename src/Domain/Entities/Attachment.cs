@@ -11,6 +11,7 @@ public sealed class Attachment : BaseEntity
     public long SizeBytes { get; set; }
     public string StorageKey { get; set; } = string.Empty;
     public StorageProvider Provider { get; set; } = StorageProvider.Local;
+    public string? Note { get; set; }
     public DateTimeOffset UploadedAt { get; set; }
     public Guid UploadedByUserId { get; set; }
 }

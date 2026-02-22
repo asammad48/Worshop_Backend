@@ -21,11 +21,10 @@ public sealed record AttachmentResponse(
     long SizeBytes,
     string StorageKey,
     StorageProvider Provider,
+    string? Note,
     DateTimeOffset UploadedAt,
     Guid UploadedByUserId,
     string? UploadedByEmail = null,
     string? OwnerDisplay = null
 );
 
-public sealed record PresignRequest(string FileName, string ContentType);
-public sealed record PresignResponse(string UploadUrl, string StorageKey, StorageProvider Provider);
