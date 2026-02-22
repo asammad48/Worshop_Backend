@@ -5,5 +5,6 @@ public enum AttendanceStatus : short
     Present = 1,
     Absent = 2,
     HalfDay = 3,
-    Leave = 4
+    Leave = 4,
+    Late = 5
 }

@@ -43,6 +43,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<JobPartRequest> JobPartRequests => Set<JobPartRequest>();
     public DbSet<Approval> Approvals => Set<Approval>();
     public DbSet<CommunicationLog> CommunicationLogs => Set<CommunicationLog>();
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -237,6 +238,7 @@ public sealed class AppDbContext : DbContext
             p.Property(x => x.Name).HasColumnName("name").IsRequired();
             p.Property(x => x.Brand).HasColumnName("brand");
             p.Property(x => x.Unit).HasColumnName("unit");
+            p.Property(x => x.ReorderLevel).HasColumnName("reorder_level").HasDefaultValue(0);
             p.HasIndex(x => x.Sku).IsUnique().HasDatabaseName("uq_parts_sku");
         });
 
@@ -290,6 +292,7 @@ public sealed class AppDbContext : DbContext
             Base(po);
             po.Property(x => x.BranchId).HasColumnName("branch_id").IsRequired();
             po.Property(x => x.SupplierId).HasColumnName("supplier_id").IsRequired();
+            po.HasOne(x => x.Supplier).WithMany().HasForeignKey(x => x.SupplierId).OnDelete(DeleteBehavior.Restrict);
             po.Property(x => x.OrderNo).HasColumnName("order_no").IsRequired();
             po.Property(x => x.Status).HasColumnName("status").HasConversion<short>().IsRequired();
             po.Property(x => x.OrderedAt).HasColumnName("ordered_at");
@@ -578,6 +581,26 @@ public sealed class AppDbContext : DbContext
             i.HasOne(x => x.JobCard).WithMany().HasForeignKey(x => x.JobCardId).OnDelete(DeleteBehavior.Cascade);
             i.HasOne(x => x.Part).WithMany().HasForeignKey(x => x.PartId).OnDelete(DeleteBehavior.Restrict);
             i.HasOne(x => x.JobPartRequest).WithMany().HasForeignKey(x => x.JobPartRequestId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<Notification>(n =>
+        {
+            n.ToTable("notifications");
+            n.HasKey(x => x.Id);
+            Base(n);
+            n.Property(x => x.Type).HasColumnName("type").IsRequired();
+            n.Property(x => x.Title).HasColumnName("title").IsRequired();
+            n.Property(x => x.Message).HasColumnName("message").IsRequired();
+            n.Property(x => x.RefType).HasColumnName("ref_type");
+            n.Property(x => x.RefId).HasColumnName("ref_id");
+            n.Property(x => x.IsRead).HasColumnName("is_read").HasDefaultValue(false);
+            n.Property(x => x.UserId).HasColumnName("user_id");
+            n.Property(x => x.BranchId).HasColumnName("branch_id");
+
+            n.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+            n.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Cascade);
+            n.HasIndex(x => x.UserId).HasDatabaseName("ix_notifications_user");
+            n.HasIndex(x => x.BranchId).HasDatabaseName("ix_notifications_branch");
         });
     }
 
