@@ -10,7 +10,12 @@ namespace Infrastructure.Services;
 public sealed class RoadblockerService : IRoadblockerService
 {
     private readonly AppDbContext _db;
-    public RoadblockerService(AppDbContext db) { _db = db; }
+    private readonly INotificationService _notifications;
+    public RoadblockerService(AppDbContext db, INotificationService notifications)
+    {
+        _db = db;
+        _notifications = notifications;
+    }
 
     public async Task<RoadblockerResponse> CreateAsync(Guid actorUserId, Guid branchId, RoadblockerCreateRequest req, CancellationToken ct = default)
     {
@@ -30,6 +35,16 @@ public sealed class RoadblockerService : IRoadblockerService
         };
         _db.Roadblockers.Add(rb);
         await _db.SaveChangesAsync(ct);
+
+        await _notifications.CreateNotificationAsync(
+            "JOB_CARD",
+            "Roadblocker Added",
+            $"New roadblocker on Job Card for vehicle {job.VehicleId}. Description: {rb.Description}",
+            "ROADBLOCKER",
+            rb.Id,
+            null,
+            branchId
+        );
 
         return Map(rb);
     }

@@ -11,7 +11,12 @@ namespace Infrastructure.Services;
 public sealed class JobCardService : IJobCardService
 {
     private readonly AppDbContext _db;
-    public JobCardService(AppDbContext db) { _db = db; }
+    private readonly INotificationService _notifications;
+    public JobCardService(AppDbContext db, INotificationService notifications)
+    {
+        _db = db;
+        _notifications = notifications;
+    }
 
     public async Task<JobCardResponse> CreateAsync(Guid actorUserId, Guid branchId, JobCardCreateRequest request, CancellationToken ct = default)
     {
@@ -155,6 +160,20 @@ public sealed class JobCardService : IJobCardService
         });
 
         await _db.SaveChangesAsync(ct);
+
+        if (status == JobCardStatus.EsperandoAprobacion)
+        {
+            await _notifications.CreateNotificationAsync(
+                "APPROVAL",
+                "Approval Required",
+                $"Job Card {id} is waiting for approval.",
+                "JOB_CARD",
+                id,
+                null,
+                branchId
+            );
+        }
+
         return await GetByIdAsync(branchId, id, ct);
     }
 

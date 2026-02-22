@@ -11,10 +11,12 @@ namespace Infrastructure.Services;
 public sealed class PartRequestService : IPartRequestService
 {
     private readonly AppDbContext _db;
+    private readonly INotificationService _notifications;
 
-    public PartRequestService(AppDbContext db)
+    public PartRequestService(AppDbContext db, INotificationService notifications)
     {
         _db = db;
+        _notifications = notifications;
     }
 
     public async Task<JobPartRequestResponse> CreateAsync(Guid actorUserId, Guid branchId, Guid jobCardId, JobPartRequestCreateRequest r, CancellationToken ct = default)
@@ -39,6 +41,16 @@ public sealed class PartRequestService : IPartRequestService
 
         _db.JobPartRequests.Add(request);
         await _db.SaveChangesAsync(ct);
+
+        await _notifications.CreateNotificationAsync(
+            "INVENTORY",
+            "Part Requested",
+            $"Part {r.PartId} requested for Job Card {jobCardId} at station {r.StationCode}.",
+            "PART_REQUEST",
+            request.Id,
+            null,
+            branchId
+        );
 
         return await GetByIdInternalAsync(branchId, request.Id, ct);
     }
