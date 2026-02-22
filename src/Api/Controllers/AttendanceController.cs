@@ -47,8 +47,9 @@ public sealed class AttendanceController : ControllerBase
 
     [HttpGet("today")]
     [Authorize(Policy = "HQManager")]
-    public async Task<ActionResult<ApiResponse<PageResponse<AttendanceRecordResponse>>>> GetToday([FromQuery] Guid? branchId, [FromQuery] Guid? employeeUserId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
+    public async Task<ActionResult<ApiResponse<PageResponse<AttendanceRecordResponse>>>> GetToday([FromQuery] Guid? branchId, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
     {
+        var employeeUserId = User.GetUserId();
         var role = User.GetRole();
         if (role == "BRANCH_MANAGER")
         {
@@ -62,9 +63,10 @@ public sealed class AttendanceController : ControllerBase
         return Ok(ApiResponse<PageResponse<AttendanceRecordResponse>>.Ok(result));
     }
 
-    [HttpGet("employee/{employeeUserId}/month")]
-    public async Task<ActionResult<ApiResponse<AttendanceMonthResponse>>> GetMonth(Guid employeeUserId, [FromQuery] int year, [FromQuery] int month, [FromQuery] Guid? branchId, CancellationToken ct)
+    [HttpGet("employee/month")]
+    public async Task<ActionResult<ApiResponse<AttendanceMonthResponse>>> GetMonth([FromQuery] int year, [FromQuery] int month, [FromQuery] Guid? branchId, CancellationToken ct)
     {
+        var employeeUserId = User.GetUserId();
         var actorId = User.GetUserId();
         var role = User.GetRole();
 
