@@ -19,5 +19,5 @@ public static class ClaimsExtensions
         return id;
     }
 
-    public static string GetRole(this ClaimsPrincipal user) => user.FindFirstValue("role") ?? "";
+    public static string GetRole(this ClaimsPrincipal user) => user.FindFirst("http://schemas.microsoft.com/ws/2008/06/identity/claims/role")?.Value ?? "";
 }

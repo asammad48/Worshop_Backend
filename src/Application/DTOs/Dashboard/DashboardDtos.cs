@@ -13,10 +13,10 @@ public sealed record KpiCardDto(
     string Key,
     string Title,
     decimal Value,
-    string? Unit = null,
-    decimal? DeltaValue = null,
-    decimal? DeltaPercent = null,
-    string? Trend = null // up|down|flat
+    string? Unit = "",
+    decimal? DeltaValue = 0,
+    decimal? DeltaPercent = 0,
+    string? Trend = "" // up|down|flat
 );
 
 public sealed record ChartPointDto(

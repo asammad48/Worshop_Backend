@@ -82,7 +82,10 @@ public sealed class DashboardService : IDashboardService
         var tzi = TimeZoneInfo.FindSystemTimeZoneById(tz);
         var dt = date.ToDateTime(TimeOnly.MinValue);
         var offset = tzi.GetUtcOffset(dt);
-        return new DateTimeOffset(dt, offset);
+
+        var local = new DateTimeOffset(dt, offset);
+
+        return local.ToUniversalTime();
     }
 
     private static DateTimeOffset GetEndOfDay(DateOnly date, string tz)
@@ -90,7 +93,9 @@ public sealed class DashboardService : IDashboardService
         var tzi = TimeZoneInfo.FindSystemTimeZoneById(tz);
         var dt = date.ToDateTime(TimeOnly.MaxValue);
         var offset = tzi.GetUtcOffset(dt);
-        return new DateTimeOffset(dt, offset);
+
+        var local = new DateTimeOffset(dt, offset);
+        return local.ToUniversalTime(); 
     }
 
     private async Task<List<KpiCardDto>> GetHqAdminCards(Guid? branchId, DateTimeOffset from, DateTimeOffset to)
