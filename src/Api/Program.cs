@@ -176,8 +176,8 @@ app.Use(async (ctx, next) =>
 
 app.UseMiddleware<AuditMiddleware>();
 
-if (app.Environment.IsDevelopment())
-{
+//if (app.Environment.IsDevelopment())
+//{
     app.UseSwagger();
     app.UseSwaggerUI();
 
@@ -187,7 +187,7 @@ if (app.Environment.IsDevelopment())
     await db.Database.MigrateAsync();
     // NOTE: Do not auto-migrate here to avoid surprises; run EF migrations explicitly.
     await DbInitializer.SeedAsync(db);
-}
+//}
 
 app.UseAuthentication();
 app.UseAuthorization();
