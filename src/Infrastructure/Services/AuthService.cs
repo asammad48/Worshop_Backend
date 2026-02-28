@@ -25,12 +25,37 @@ public sealed class AuthService : IAuthService
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(request.Password))
             throw new ValidationException("Invalid login request", new[] { "Email and password are required." });
 
-        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Email.ToLower() == email && !x.IsDeleted && x.IsActive, ct);
+        var user = await _db.Users.FirstOrDefaultAsync(x => x.Email.ToLower() == email && !x.IsDeleted && x.IsActive, ct);
         if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             throw new DomainException("Invalid credentials", 401, new[] { "Invalid email or password." });
 
         var token = _jwt.CreateToken(user);
-        return new LoginResponseDto(token, user.Role.ToString(), user.BranchId);
+        var refreshToken = _jwt.GenerateRefreshToken();
+
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiry = DateTimeOffset.UtcNow.AddDays(7);
+        await _db.SaveChangesAsync(ct);
+
+        return new LoginResponseDto(token, refreshToken, user.Role.ToString(), user.BranchId);
+    }
+
+    public async Task<LoginResponseDto> RefreshTokenAsync(RefreshTokenRequestDto request, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            throw new ValidationException("Invalid refresh token request", new[] { "Refresh token is required." });
+
+        var user = await _db.Users.FirstOrDefaultAsync(x => x.RefreshToken != null && x.RefreshToken == request.RefreshToken && !x.IsDeleted && x.IsActive, ct);
+        if (user == null || user.RefreshTokenExpiry < DateTimeOffset.UtcNow)
+            throw new DomainException("Invalid or expired refresh token", 401);
+
+        var token = _jwt.CreateToken(user);
+        var newRefreshToken = _jwt.GenerateRefreshToken();
+
+        user.RefreshToken = newRefreshToken;
+        user.RefreshTokenExpiry = DateTimeOffset.UtcNow.AddDays(7);
+        await _db.SaveChangesAsync(ct);
+
+        return new LoginResponseDto(token, newRefreshToken, user.Role.ToString(), user.BranchId);
     }
 
     public async Task ChangePasswordAsync(Guid userId, ChangePasswordDto request, CancellationToken ct = default)

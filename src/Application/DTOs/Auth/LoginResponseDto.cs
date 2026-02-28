@@ -1,2 +1,2 @@
 namespace Application.DTOs.Auth;
-public sealed record LoginResponseDto(string AccessToken,string Role,Guid? BranchId);
+public sealed record LoginResponseDto(string AccessToken, string RefreshToken, string Role, Guid? BranchId);
