@@ -128,9 +128,9 @@ public sealed class DashboardService : IDashboardService
         return new List<KpiCardDto>
         {
             new("total_jobcards_open", "Open Job Cards", openJobCards),
-            new("revenue_collected", "Revenue", revenue, "PKR"),
-            new("expenses_total", "Expenses", expenses, "PKR"),
-            new("wages_total", "Wages", wages, "PKR"),
+            new("revenue_collected", "Revenue", revenue, "EUR"),
+            new("expenses_total", "Expenses", expenses, "EUR"),
+            new("wages_total", "Wages", wages, "EUR"),
             new("low_stock_items", "Low Stock", lowStock),
             new("approvals_pending", "Pending Approvals", pendingApprovals)
         };
@@ -203,7 +203,7 @@ public sealed class DashboardService : IDashboardService
             new("roadblockers_open", "Roadblockers", roadblockers),
             new("tasks_overdue", "Tasks Overdue", overdueTasks),
             new("parts_waiting", "Parts Waiting", partsWaiting),
-            new("collections_today", "Collections Today", collectionsToday, "PKR")
+            new("collections_today", "Collections Today", collectionsToday, "EUR")
         };
     }
 
@@ -302,9 +302,9 @@ public sealed class DashboardService : IDashboardService
         return new List<KpiCardDto>
         {
             new("invoices_due_count", "Due Invoices", invoicesDue),
-            new("due_amount_total", "Total Due", dueAmount, "PKR"),
+            new("due_amount_total", "Total Due", dueAmount, "EUR"),
             new("approvals_pending_cashier", "Approvals Pending", pendingApprovals),
-            new("payments_today", "Payments Today", paymentsToday, "PKR")
+            new("payments_today", "Payments Today", paymentsToday, "EUR")
         };
     }
 
