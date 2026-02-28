@@ -19,6 +19,11 @@ public sealed class AuthController : ControllerBase
     public async Task<ActionResult<ApiResponse<LoginResponseDto>>> Login([FromBody] LoginRequestDto req, CancellationToken ct)
         => ApiResponse<LoginResponseDto>.Ok(await _auth.LoginAsync(req, ct));
 
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    public async Task<ActionResult<ApiResponse<LoginResponseDto>>> Refresh([FromBody] RefreshTokenRequestDto req, CancellationToken ct)
+        => ApiResponse<LoginResponseDto>.Ok(await _auth.RefreshTokenAsync(req, ct));
+
     [HttpPost("change-password")]
     [Authorize(Policy = "BranchUser")]
     public async Task<ActionResult<ApiResponse<string>>> ChangePassword([FromBody] ChangePasswordDto req, CancellationToken ct)
