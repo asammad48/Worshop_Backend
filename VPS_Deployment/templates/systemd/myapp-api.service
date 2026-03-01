@@ -1,0 +1,15 @@
+[Unit]
+Description=MyApp .NET API
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/apps/myapp/api/publish
+ExecStart=/usr/bin/dotnet /opt/apps/myapp/api/publish/Api.dll
+Restart=always
+RestartSec=5
+SyslogIdentifier=myapp-api
+User=deploy
+EnvironmentFile=/opt/apps/myapp/shared/myapp.env
+
+[Install]
+WantedBy=multi-user.target
