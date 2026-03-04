@@ -80,7 +80,10 @@ public sealed class AppDbContext : DbContext
             u.Property(x => x.Role).HasColumnName("role").HasConversion<short>().IsRequired();
             u.Property(x => x.BranchId).HasColumnName("branch_id");
             u.Property(x => x.IsActive).HasColumnName("is_active").HasDefaultValue(true);
+            u.Property(x => x.RefreshToken).HasColumnName("refresh_token");
+            u.Property(x => x.RefreshTokenExpiry).HasColumnName("refresh_token_expiry");
             u.HasIndex(x => x.Email).IsUnique().HasDatabaseName("uq_users_email");
+            u.HasIndex(x => x.RefreshToken).IsUnique().HasDatabaseName("uq_users_refresh_token");
             u.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
         });
 

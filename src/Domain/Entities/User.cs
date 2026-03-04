@@ -8,4 +8,7 @@ public sealed class User : BaseEntity
     public Guid? BranchId { get; set; }
     public Branch? Branch { get; set; }
     public bool IsActive { get; set; } = true;
+
+    public string? RefreshToken { get; set; }
+    public DateTimeOffset? RefreshTokenExpiry { get; set; }
 }
