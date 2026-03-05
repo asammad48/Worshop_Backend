@@ -22,14 +22,22 @@ public sealed class BillingService : IBillingService
         {
             if (request.Subtotal < 0 || request.Discount < 0 || request.Tax < 0)
                 throw new ValidationException("Validation failed", new[] { "Amounts cannot be negative." });
+            var subtotal = await _db.JobLineItems.Where(x => x.JobCardId == jobCardId && !x.IsDeleted).SumAsync(x => x.Total, ct);
+            if (subtotal == 0 && request.Subtotal != 0)
+                throw new ValidationException("Validation failed", new[] { "Subtotal must be 0 if there are no line items." });
+            var discountAmount = subtotal * request.Discount / 100m;
+            var discountedSubtotal = subtotal - discountAmount;
 
+            var taxAmount = discountedSubtotal * request.Tax / 100m;
+
+            var total = discountedSubtotal + taxAmount;
             inv = new Domain.Entities.Invoice
             {
                 JobCardId = jobCardId,
-                Subtotal = request.Subtotal,
+                Subtotal = subtotal,
                 Discount = request.Discount,
                 Tax = request.Tax,
-                Total = Math.Max(0, request.Subtotal - request.Discount + request.Tax),
+                Total = Math.Max(0, total),
                 PaymentStatus = PaymentStatus.Pending
             };
             _db.Invoices.Add(inv);
@@ -147,7 +155,17 @@ public sealed class BillingService : IBillingService
 
         var subtotal = await _db.JobLineItems.Where(x => x.JobCardId == jobCardId && !x.IsDeleted).SumAsync(x => x.Total, ct);
         inv.Subtotal = subtotal;
-        inv.Total = Math.Max(0, inv.Subtotal - inv.Discount + inv.Tax);
+
+        var discountPct = Math.Clamp(inv.Discount, 0m, 100m);
+        var taxPct = Math.Max(0m, inv.Tax); // if you allow >100% tax, keep it; otherwise clamp to 100 too
+
+        var discountAmount = inv.Subtotal * discountPct / 100m;
+        var discountedSubtotal = inv.Subtotal - discountAmount;
+
+        // tax AFTER discount (standard). If you want tax on original subtotal, change base to inv.Subtotal.
+        var taxAmount = discountedSubtotal * taxPct / 100m;
+
+        inv.Total = Math.Max(0m, discountedSubtotal + taxAmount);
 
         // re-evaluate payment status
         var totalPaid = await _db.Payments.AsNoTracking().Where(x => x.InvoiceId == inv.Id && !x.IsDeleted).SumAsync(x => x.Amount, ct);
