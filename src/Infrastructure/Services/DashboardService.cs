@@ -131,6 +131,7 @@ public sealed class DashboardService : IDashboardService
             new("revenue_collected", "Revenue", revenue, "EUR"),
             new("expenses_total", "Expenses", expenses, "EUR"),
             new("wages_total", "Wages", wages, "EUR"),
+            new("profit_total", "Profit", (revenue-expenses-wages), "EUR"),
             new("low_stock_items", "Low Stock", lowStock),
             new("approvals_pending", "Pending Approvals", pendingApprovals)
         };
