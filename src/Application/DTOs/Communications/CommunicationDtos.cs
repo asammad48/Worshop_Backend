@@ -4,18 +4,21 @@ namespace Application.DTOs.Communications;
 
 public sealed record CommunicationLogCreateRequest(
     Guid JobCardId,
-    CommunicationChannel Channel,
-    CommunicationMessageType MessageType,
-    string? Notes);
+    CommunicationType Type,
+    CommunicationDirection Direction,
+    string Summary,
+    string? Details,
+    DateTimeOffset OccurredAt);
 
 public sealed record CommunicationLogResponse(
     Guid Id,
-    Guid BranchId,
+    Guid? BranchId,
     Guid JobCardId,
-    CommunicationChannel Channel,
-    CommunicationMessageType MessageType,
-    DateTimeOffset SentAt,
-    string? Notes,
-    Guid SentByUserId,
+    CommunicationType Type,
+    CommunicationDirection Direction,
+    string Summary,
+    string? Details,
+    DateTimeOffset OccurredAt,
+    Guid CreatedByUserId,
     string? CreatedByEmail = null,
     string? JobCardPlate = null);

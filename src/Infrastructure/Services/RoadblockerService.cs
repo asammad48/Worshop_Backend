@@ -61,6 +61,7 @@ public sealed class RoadblockerService : IRoadblockerService
         {
             rb.IsResolved = true;
             rb.ResolvedAt = DateTimeOffset.UtcNow;
+            rb.ResolvedByUserId = actorUserId;
             await _db.SaveChangesAsync(ct);
         }
         return Map(rb);

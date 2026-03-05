@@ -34,7 +34,7 @@ public sealed class ReportService : IReportService
             .ToListAsync(ct);
 
         var commsCount = await _db.CommunicationLogs.AsNoTracking()
-            .CountAsync(x => !x.IsDeleted && x.BranchId == branchId && x.SentAt >= from && x.SentAt <= to, ct);
+            .CountAsync(x => !x.IsDeleted && x.BranchId == branchId && x.OccurredAt >= from && x.OccurredAt <= to, ct);
 
         var dict = rb.ToDictionary(x => x.Key, x => x.Count);
         return new SummaryReportResponse(expenses, wages, inShop, dict, commsCount);
