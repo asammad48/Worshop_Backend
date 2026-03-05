@@ -48,16 +48,31 @@ public sealed class WorkStationService : IWorkStationService
         return new PageResponse<WorkStationResponse>(items, total, page, size);
     }
 
-    public async Task<IReadOnlyList<JobCardStationHistoryResponse>> GetJobCardHistoryAsync(Guid branchId, Guid jobCardId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<JobCardStationHistoryResponse>> GetJobCardHistoryAsync(
+    Guid branchId, Guid jobCardId, CancellationToken ct = default)
     {
         var jobExists = await _db.JobCards.AnyAsync(x => x.Id == jobCardId && x.BranchId == branchId && !x.IsDeleted, ct);
         if (!jobExists) throw new NotFoundException("Job card not found");
 
-        return await _db.JobCardWorkStationHistories.AsNoTracking()
-            .Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
-            .OrderBy(x => x.MovedAt)
-            .Select(x => new JobCardStationHistoryResponse(x.Id, x.JobCardId, x.WorkStationId, x.MovedAt, x.MovedByUserId, x.Notes))
-            .ToListAsync(ct);
+        var q =
+            from h in _db.JobCardWorkStationHistories.AsNoTracking()
+            join ws in _db.WorkStations.AsNoTracking() on h.WorkStationId equals ws.Id
+            join u in _db.Users.AsNoTracking() on h.MovedByUserId equals u.Id into uj
+            from u in uj.DefaultIfEmpty()
+            where h.JobCardId == jobCardId && !h.IsDeleted
+            orderby h.MovedAt
+            select new JobCardStationHistoryResponse(
+                h.Id,
+                h.JobCardId,
+                h.WorkStationId,
+                h.MovedAt,
+                h.MovedByUserId,
+                h.Notes,
+                ws.Code,
+                u != null ? u.Email : "-"
+            );
+
+        return await q.ToListAsync(ct);
     }
 
     public async Task<JobCardStationHistoryResponse> MoveJobCardAsync(Guid actorUserId, Guid branchId, Guid jobCardId, MoveJobCardRequest request, CancellationToken ct = default)
@@ -78,6 +93,6 @@ public sealed class WorkStationService : IWorkStationService
         };
         _db.JobCardWorkStationHistories.Add(hist);
         await _db.SaveChangesAsync(ct);
-        return new JobCardStationHistoryResponse(hist.Id, hist.JobCardId, hist.WorkStationId, hist.MovedAt, hist.MovedByUserId, hist.Notes);
+        return new JobCardStationHistoryResponse(hist.Id, hist.JobCardId, hist.WorkStationId, hist.MovedAt, hist.MovedByUserId, hist.Notes,"-","-");
     }
 }
