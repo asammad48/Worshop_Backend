@@ -288,8 +288,8 @@ public sealed class PrintService : IPrintService
             payload = $"{jobCardId}|{token}";
         }
 
-        var baseUrl = _config["App:BaseUrl"] ?? "https://workshop.example.com";
-        var publicUrl = $"{baseUrl}/public/receipt/jobcards/{jobCardId}" + (string.IsNullOrEmpty(token) ? "" : $"?t={token}");
+        var baseUrl = _config["App:BaseUrl"] ?? "http://dashboard.motoritaller.es";
+        var publicUrl = $"{baseUrl}/r/jobcards/{jobCardId}" + (string.IsNullOrEmpty(token) ? "" : $"?t={token}");
 
         var document = Document.Create(container =>
         {
