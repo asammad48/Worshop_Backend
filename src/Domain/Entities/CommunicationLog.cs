@@ -4,18 +4,20 @@ namespace Domain.Entities;
 
 public sealed class CommunicationLog : BaseEntity
 {
-    public Guid BranchId { get; set; }
+    public Guid? BranchId { get; set; }
     public Branch? Branch { get; set; }
 
     public Guid JobCardId { get; set; }
     public JobCard? JobCard { get; set; }
 
-    public CommunicationChannel Channel { get; set; }
-    public CommunicationMessageType MessageType { get; set; }
+    public CommunicationType Type { get; set; }
+    public CommunicationDirection Direction { get; set; }
 
-    public DateTimeOffset SentAt { get; set; }
-    public string? Notes { get; set; }
+    public string Summary { get; set; } = string.Empty;
+    public string? Details { get; set; }
 
-    public Guid SentByUserId { get; set; }
-    public User? SentByUser { get; set; }
+    public DateTimeOffset OccurredAt { get; set; }
+
+    public Guid CreatedByUserId { get; set; }
+    public User? CreatedByUser { get; set; }
 }

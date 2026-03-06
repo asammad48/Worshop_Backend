@@ -25,11 +25,12 @@ public sealed class CommunicationService : ICommunicationService
         {
             BranchId = branchId,
             JobCardId = request.JobCardId,
-            Channel = request.Channel,
-            MessageType = request.MessageType,
-            SentAt = DateTimeOffset.UtcNow,
-            Notes = request.Notes,
-            SentByUserId = actorUserId,
+            Type = request.Type,
+            Direction = request.Direction,
+            Summary = request.Summary,
+            Details = request.Details,
+            OccurredAt = request.OccurredAt,
+            CreatedByUserId = actorUserId,
             CreatedBy = actorUserId
         };
 
@@ -45,12 +46,12 @@ public sealed class CommunicationService : ICommunicationService
         if (!jobExists) throw new NotFoundException("Job card not found");
 
         return await (from log in _db.CommunicationLogs.Where(x => x.JobCardId == jobCardId && x.BranchId == branchId && !x.IsDeleted)
-                      join user in _db.Users on log.SentByUserId equals user.Id
+                      join user in _db.Users on log.CreatedByUserId equals user.Id
                       join job in _db.JobCards on log.JobCardId equals job.Id
                       join vehicle in _db.Vehicles on job.VehicleId equals vehicle.Id
-                      orderby log.SentAt descending
+                      orderby log.OccurredAt descending
                       select new CommunicationLogResponse(
-                          log.Id, log.BranchId, log.JobCardId, log.Channel, log.MessageType, log.SentAt, log.Notes, log.SentByUserId,
+                          log.Id, log.BranchId, log.JobCardId, log.Type, log.Direction, log.Summary, log.Details, log.OccurredAt, log.CreatedByUserId,
                           user.Email, vehicle.Plate
                       )).ToListAsync(ct);
     }
@@ -58,17 +59,14 @@ public sealed class CommunicationService : ICommunicationService
     private async Task<CommunicationLogResponse> GetByIdInternalAsync(Guid logId, CancellationToken ct)
     {
         var logEntry = await (from log in _db.CommunicationLogs.Where(x => x.Id == logId && !x.IsDeleted)
-                              join user in _db.Users on log.SentByUserId equals user.Id
+                              join user in _db.Users on log.CreatedByUserId equals user.Id
                               join job in _db.JobCards on log.JobCardId equals job.Id
                               join vehicle in _db.Vehicles on job.VehicleId equals vehicle.Id
                               select new CommunicationLogResponse(
-                                  log.Id, log.BranchId, log.JobCardId, log.Channel, log.MessageType, log.SentAt, log.Notes, log.SentByUserId,
+                                  log.Id, log.BranchId, log.JobCardId, log.Type, log.Direction, log.Summary, log.Details, log.OccurredAt, log.CreatedByUserId,
                                   user.Email, vehicle.Plate
                               )).FirstOrDefaultAsync(ct);
 
         return logEntry ?? throw new NotFoundException("Communication log not found");
     }
-
-    private static CommunicationLogResponse Map(CommunicationLog x)
-        => new(x.Id, x.BranchId, x.JobCardId, x.Channel, x.MessageType, x.SentAt, x.Notes, x.SentByUserId);
 }

@@ -482,7 +482,10 @@ public sealed class AppDbContext : DbContext
             r.Property(x => x.CreatedAtLocal).HasColumnName("created_at_local").HasDefaultValueSql("now()");
             r.Property(x => x.ResolvedAt).HasColumnName("resolved_at");
             r.Property(x => x.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
+            r.Property(x => x.ResolvedByUserId).HasColumnName("resolved_by_user_id");
             r.HasIndex(x => x.JobCardId).HasDatabaseName("ix_roadblockers_jobcard");
+            r.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+            r.HasOne(x => x.ResolvedByUser).WithMany().HasForeignKey(x => x.ResolvedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<JobTask>(t =>
@@ -526,14 +529,15 @@ public sealed class AppDbContext : DbContext
             c.ToTable("communication_logs");
             c.HasKey(x => x.Id);
             Base(c);
-            c.Property(x => x.BranchId).HasColumnName("branch_id").IsRequired();
+            c.Property(x => x.BranchId).HasColumnName("branch_id");
             c.Property(x => x.JobCardId).HasColumnName("job_card_id").IsRequired();
-            c.Property(x => x.Channel).HasColumnName("channel").HasConversion<short>().IsRequired();
-            c.Property(x => x.MessageType).HasColumnName("message_type").HasConversion<short>().IsRequired();
-            c.Property(x => x.SentAt).HasColumnName("sent_at").HasDefaultValueSql("now()");
-            c.Property(x => x.Notes).HasColumnName("notes");
-            c.Property(x => x.SentByUserId).HasColumnName("sent_by_user_id").IsRequired();
-            c.HasIndex(x => x.JobCardId).HasDatabaseName("ix_commlogs_jobcard");
+            c.Property(x => x.Type).HasColumnName("type").HasConversion<short>().IsRequired();
+            c.Property(x => x.Direction).HasColumnName("direction").HasConversion<short>().IsRequired();
+            c.Property(x => x.Summary).HasColumnName("summary").IsRequired();
+            c.Property(x => x.Details).HasColumnName("details");
+            c.Property(x => x.OccurredAt).HasColumnName("occurred_at").IsRequired();
+            c.Property(x => x.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
+            c.HasIndex(x => new { x.JobCardId, x.OccurredAt }).HasDatabaseName("ix_commlogs_jobcard_date");
             c.HasOne(x => x.JobCard).WithMany().HasForeignKey(x => x.JobCardId).OnDelete(DeleteBehavior.Cascade);
             c.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
         });
