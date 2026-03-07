@@ -15,4 +15,9 @@ public sealed class JobCard : BaseEntity
     public int? Mileage { get; set; }
     public string? InitialReport { get; set; }
     public string? Diagnosis { get; set; }
+
+    public DateTimeOffset? RequestedEta { get; set; }
+    public DateTimeOffset? LatestEstimatedEta { get; set; }
+    public decimal? LatestEstimatedPrice { get; set; }
+    public string? LatestDiagnosisSummary { get; set; }
 }

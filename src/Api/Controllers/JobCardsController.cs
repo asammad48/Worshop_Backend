@@ -166,4 +166,21 @@ public sealed class JobCardsController : ControllerBase
         var branchId = User.GetBranchIdOrThrow();
         return ApiResponse<InvoiceResponse>.Ok(await _billing.GetInvoiceAsync(branchId, id, ct));
     }
+
+    [HttpPost("{id:guid}/diagnosis-logs")]
+    [Authorize(Roles = "BRANCH_MANAGER,TECHNICIAN,HQ_ADMIN")]
+    public async Task<ActionResult<ApiResponse<JobCardDiagnosisLogResponse>>> AddDiagnosisLog(Guid id, [FromBody] JobCardDiagnosisLogCreateRequest req, CancellationToken ct)
+    {
+        var branchId = User.GetBranchIdOrThrow();
+        var userId = User.GetUserId();
+        return ApiResponse<JobCardDiagnosisLogResponse>.Ok(await _jobs.AddDiagnosisLogAsync(branchId, id, userId, req, ct));
+    }
+
+    [HttpGet("{id:guid}/diagnosis-logs")]
+    [Authorize(Roles = "BRANCH_MANAGER,TECHNICIAN,CASHIER,STOREKEEPER,HQ_ADMIN")]
+    public async Task<ActionResult<ApiResponse<JobCardDiagnosisTimelineResponse>>> GetDiagnosisTimeline(Guid id, CancellationToken ct)
+    {
+        var branchId = User.GetBranchIdOrThrow();
+        return ApiResponse<JobCardDiagnosisTimelineResponse>.Ok(await _jobs.GetDiagnosisTimelineAsync(branchId, id, ct));
+    }
 }

@@ -15,5 +15,9 @@ public sealed record JobCardResponse(
     string? VehiclePlate = null,
     string? BranchName = null,
     string? CurrentStationName = null,
-    string? CurrentStationCode = null
+    string? CurrentStationCode = null,
+    DateTimeOffset? RequestedEta = null,
+    DateTimeOffset? LatestEstimatedEta = null,
+    decimal? LatestEstimatedPrice = null,
+    string? LatestDiagnosisSummary = null
 );

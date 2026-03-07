@@ -33,6 +33,7 @@ public sealed class JobCardService : IJobCardService
             CustomerId = vehicle.CustomerId,
             Mileage = request.Mileage,
             InitialReport = request.InitialReport?.Trim(),
+            RequestedEta = request.RequestedEta,
             Status = JobCardStatus.NuevaSolicitud
         };
         _db.JobCards.Add(job);
@@ -77,7 +78,11 @@ public sealed class JobCardService : IJobCardService
                     .Where(h => h.JobCardId == x.Id && !h.IsDeleted)
                     .OrderByDescending(h => h.MovedAt)
                     .Select(h => h.WorkStation != null ? h.WorkStation.Code : null)
-                    .FirstOrDefault()
+                    .FirstOrDefault(),
+                x.RequestedEta,
+                x.LatestEstimatedEta,
+                x.LatestEstimatedPrice,
+                x.LatestDiagnosisSummary
             ))
             .ToListAsync(ct);
         return new PageResponse<JobCardResponse>(items, total, page, size);
@@ -104,7 +109,8 @@ public sealed class JobCardService : IJobCardService
         return new JobCardResponse(
             x.Id, x.BranchId, x.CustomerId, x.VehicleId, x.Status, x.EntryAt, x.ExitAt, x.Mileage, x.InitialReport, x.Diagnosis,
             x.Customer?.FullName, x.Vehicle?.Plate, x.Branch?.Name,
-            station?.Name, station?.Code);
+            station?.Name, station?.Code,
+            x.RequestedEta, x.LatestEstimatedEta, x.LatestEstimatedPrice, x.LatestDiagnosisSummary);
     }
 
     public async Task<JobCardResponse> CheckInAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default)
@@ -185,6 +191,78 @@ public sealed class JobCardService : IJobCardService
         return await GetByIdAsync(branchId, id, ct);
     }
 
+    public async Task<JobCardDiagnosisLogResponse> AddDiagnosisLogAsync(Guid branchId, Guid jobCardId, Guid actorUserId, JobCardDiagnosisLogCreateRequest request, CancellationToken ct = default)
+    {
+        var job = await LoadBranchJob(branchId, jobCardId, ct);
+
+        using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        try
+        {
+            var log = new Domain.Entities.JobCardDiagnosisLog
+            {
+                JobCardId = job.Id,
+                DiagnosisNote = request.DiagnosisNote.Trim(),
+                EstimatedEta = request.EstimatedEta,
+                EstimatedPrice = request.EstimatedPrice,
+                CreatedByUserId = actorUserId,
+                CreatedBy = actorUserId
+            };
+
+            job.LatestDiagnosisSummary = log.DiagnosisNote;
+            job.LatestEstimatedEta = log.EstimatedEta;
+            job.LatestEstimatedPrice = log.EstimatedPrice;
+
+            _db.JobCardDiagnosisLogs.Add(log);
+            await _db.SaveChangesAsync(ct);
+            await transaction.CommitAsync(ct);
+
+            var user = await _db.Users.AsNoTracking().FirstAsync(u => u.Id == actorUserId, ct);
+
+            return new JobCardDiagnosisLogResponse(
+                log.Id,
+                log.JobCardId,
+                log.DiagnosisNote,
+                log.EstimatedEta,
+                log.EstimatedPrice,
+                log.CreatedByUserId,
+                user.Email,
+                log.CreatedAt);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
+    public async Task<JobCardDiagnosisTimelineResponse> GetDiagnosisTimelineAsync(Guid branchId, Guid jobCardId, CancellationToken ct = default)
+    {
+        var job = await LoadBranchJob(branchId, jobCardId, ct);
+
+        var logs = await _db.JobCardDiagnosisLogs
+            .AsNoTracking()
+            .Where(l => l.JobCardId == jobCardId && !l.IsDeleted)
+            .OrderByDescending(l => l.CreatedAt)
+            .Select(l => new JobCardDiagnosisLogResponse(
+                l.Id,
+                l.JobCardId,
+                l.DiagnosisNote,
+                l.EstimatedEta,
+                l.EstimatedPrice,
+                l.CreatedByUserId,
+                l.CreatedByUser != null ? l.CreatedByUser.Email : string.Empty,
+                l.CreatedAt))
+            .ToListAsync(ct);
+
+        return new JobCardDiagnosisTimelineResponse(
+            job.Id,
+            job.RequestedEta,
+            job.LatestEstimatedEta,
+            job.LatestEstimatedPrice,
+            job.LatestDiagnosisSummary,
+            logs);
+    }
+
     private async Task<Domain.Entities.JobCard> LoadBranchJob(Guid branchId, Guid id, CancellationToken ct)
     {
         var job = await _db.JobCards
@@ -212,6 +290,10 @@ public sealed class JobCardService : IJobCardService
             x.Vehicle?.Plate,
             x.Branch?.Name,
             null, // Map cannot easily fetch history without DB context
-            null
+            null,
+            x.RequestedEta,
+            x.LatestEstimatedEta,
+            x.LatestEstimatedPrice,
+            x.LatestDiagnosisSummary
         );
 }

@@ -13,6 +13,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<JobCard> JobCards => Set<JobCard>();
+    public DbSet<JobCardDiagnosisLog> JobCardDiagnosisLogs => Set<JobCardDiagnosisLog>();
     public DbSet<WorkStation> WorkStations => Set<WorkStation>();
     public DbSet<JobCardWorkStationHistory> JobCardWorkStationHistories => Set<JobCardWorkStationHistory>();
     public DbSet<JobCardApproval> JobCardApprovals => Set<JobCardApproval>();
@@ -127,10 +128,29 @@ public sealed class AppDbContext : DbContext
             j.Property(x => x.Mileage).HasColumnName("mileage");
             j.Property(x => x.InitialReport).HasColumnName("initial_report");
             j.Property(x => x.Diagnosis).HasColumnName("diagnosis");
+            j.Property(x => x.RequestedEta).HasColumnName("requested_eta");
+            j.Property(x => x.LatestEstimatedEta).HasColumnName("latest_estimated_eta");
+            j.Property(x => x.LatestEstimatedPrice).HasColumnName("latest_estimated_price").HasColumnType("numeric(18,2)");
+            j.Property(x => x.LatestDiagnosisSummary).HasColumnName("latest_diagnosis_summary");
             j.HasIndex(x => new { x.BranchId, x.Status }).HasDatabaseName("ix_job_cards_branch_status");
             j.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
             j.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
             j.HasOne(x => x.Vehicle).WithMany().HasForeignKey(x => x.VehicleId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<JobCardDiagnosisLog>(l =>
+        {
+            l.ToTable("jobcard_diagnosis_logs");
+            l.HasKey(x => x.Id);
+            Base(l);
+            l.Property(x => x.JobCardId).HasColumnName("jobcard_id").IsRequired();
+            l.Property(x => x.DiagnosisNote).HasColumnName("diagnosis_note").IsRequired();
+            l.Property(x => x.EstimatedEta).HasColumnName("estimated_eta");
+            l.Property(x => x.EstimatedPrice).HasColumnName("estimated_price").HasColumnType("numeric(18,2)");
+            l.Property(x => x.CreatedByUserId).HasColumnName("created_by_user_id").IsRequired();
+            l.HasIndex(x => new { x.JobCardId, x.CreatedAt }).HasDatabaseName("ix_jobcard_diagnosis_logs_jobcard_created");
+            l.HasOne(x => x.JobCard).WithMany().HasForeignKey(x => x.JobCardId).OnDelete(DeleteBehavior.Cascade);
+            l.HasOne(x => x.CreatedByUser).WithMany().HasForeignKey(x => x.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<WorkStation>(w =>
