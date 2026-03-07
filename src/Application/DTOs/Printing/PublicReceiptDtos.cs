@@ -32,6 +32,8 @@ public sealed record PublicJobCardReceiptResponse(
     string BranchName,
     DateTimeOffset EntryAt,
     DateTimeOffset? ExitAt,
+    DateTimeOffset? RequestedEta,
+    DateTimeOffset? LatestEstimatedEta,
     string Status,
     PublicReceiptInvoiceDto Invoice,
     IReadOnlyList<PublicReceiptPaymentDto> Payments,

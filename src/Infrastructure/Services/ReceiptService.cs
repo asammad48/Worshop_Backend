@@ -85,6 +85,8 @@ public sealed class ReceiptService : IReceiptService
             job.Branch?.Name ?? "N/A",
             job.EntryAt ?? job.CreatedAt,
             job.ExitAt,
+            job.RequestedEta,
+            job.LatestEstimatedEta,
             job.Status.ToString(),
             publicInvoice,
             payments,
