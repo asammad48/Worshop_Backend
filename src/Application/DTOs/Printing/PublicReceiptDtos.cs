@@ -11,6 +11,8 @@ public sealed record PublicReceiptInvoiceDto(
     decimal Subtotal,
     decimal Discount,
     decimal Tax,
+    decimal DiscountAmount,
+    decimal TaxAmount,
     decimal Total,
     decimal Paid,
     decimal Due,
