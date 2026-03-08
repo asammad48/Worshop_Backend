@@ -60,11 +60,22 @@ public sealed class ReceiptService : IReceiptService
             payments = dbPayments.Select(x => new PublicReceiptPaymentDto(x.PaidAt, x.Amount, x.Method.ToString())).ToList();
         }
 
+        decimal discountAmount = 0;
+        decimal taxAmount = 0;
+        if (invoice != null)
+        {
+            discountAmount = invoice.Subtotal * (invoice.Discount / 100m);
+            var discountedSubtotal = invoice.Subtotal - discountAmount;
+            taxAmount = discountedSubtotal * (invoice.Tax / 100m);
+        }
+
         var publicInvoice = new PublicReceiptInvoiceDto(
             invoice != null,
             invoice?.Subtotal ?? 0,
             invoice?.Discount ?? 0,
             invoice?.Tax ?? 0,
+            discountAmount,
+            taxAmount,
             invoice?.Total ?? 0,
             paid,
             (invoice?.Total ?? 0) - paid,

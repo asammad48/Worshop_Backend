@@ -295,41 +295,117 @@ public sealed class PrintService : IPrintService
         {
             container.Page(page =>
             {
-                page.Margin(1, Unit.Centimetre);
-                page.Content().Column(col => {
-                    col.Item().AlignCenter().Text(data.BranchName).FontSize(18).SemiBold();
-                    col.Item().AlignCenter().Text("Visit Summary").FontSize(14);
+                page.Margin(1.5f, Unit.Centimetre);
+                page.PageColor(Colors.White);
+                page.DefaultTextStyle(x => x.FontSize(10));
 
-                    col.Item().PaddingTop(10).Row(row => {
-                        row.RelativeItem().Column(c => {
-                            c.Item().Text($"Plate: {data.Plate}");
-                            c.Item().Text($"Customer: {data.CustomerName}");
+                page.Header().Row(row =>
+                {
+                    row.RelativeItem().Column(col =>
+                    {
+                        col.Item().Text(data.BranchName).FontSize(24).SemiBold().FontColor(Colors.Blue.Medium);
+                        col.Item().Text("Visit Summary").FontSize(14).Italic();
+                    });
+
+                    // Dummy logo placeholder
+                    row.ConstantItem(60).Height(60).Background(Colors.Grey.Lighten3).AlignCenter().AlignMiddle().Text("LOGO").FontSize(12).FontColor(Colors.Grey.Medium);
+                });
+
+                page.Content().PaddingVertical(15).Column(col =>
+                {
+                    // Basic Information
+                    col.Item().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingBottom(10).Row(row =>
+                    {
+                        row.RelativeItem().Column(c =>
+                        {
+                            c.Item().Text(t => { t.Span("Plate: ").Bold(); t.Span(data.Plate); });
+                            c.Item().Text(t => { t.Span("Customer: ").Bold(); t.Span(data.CustomerName); });
+                            c.Item().Text(t => { t.Span("Status: ").Bold(); t.Span(data.Status); });
                         });
-                        row.RelativeItem().AlignRight().Column(c => {
-                            c.Item().Text($"Status: {data.Status}");
-                            c.Item().Text($"Date: {data.EntryAt:d}");
+                        row.RelativeItem().AlignRight().Column(c =>
+                        {
+                            c.Item().Text(t => { t.Span("Entry: ").Bold(); t.Span(data.EntryAt.ToString("g")); });
+                            if (data.ExitAt.HasValue)
+                                c.Item().Text(t => { t.Span("Exit: ").Bold(); t.Span(data.ExitAt.Value.ToString("g")); });
                         });
                     });
 
-                    col.Item().PaddingTop(10).Table(table => {
-                        table.ColumnsDefinition(columns => {
-                            columns.RelativeColumn();
-                            columns.ConstantColumn(80);
+                    // Items if available
+                    if (data.Invoice.HasInvoice && data.Invoice.Lines.Any())
+                    {
+                        col.Item().PaddingTop(15).Text("Service Details").FontSize(14).SemiBold();
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn();
+                                columns.ConstantColumn(60);
+                                columns.ConstantColumn(80);
+                                columns.ConstantColumn(80);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(CellStyle).Text("Description");
+                                header.Cell().Element(CellStyle).AlignRight().Text("Qty");
+                                header.Cell().Element(CellStyle).AlignRight().Text("Unit Price");
+                                header.Cell().Element(CellStyle).AlignRight().Text("Amount");
+                            });
+
+                            foreach (var line in data.Invoice.Lines)
+                            {
+                                table.Cell().Element(CellStyle).Text(line.Name);
+                                table.Cell().Element(CellStyle).AlignRight().Text(line.Qty.ToString("N2"));
+                                table.Cell().Element(CellStyle).AlignRight().Text(line.UnitPrice.ToString("N2"));
+                                table.Cell().Element(CellStyle).AlignRight().Text(line.Amount.ToString("N2"));
+                            }
                         });
-                        table.Cell().Element(CellStyle).Text("Total Amount");
-                        table.Cell().Element(CellStyle).AlignRight().Text(data.Invoice.Total.ToString("N2"));
-                        table.Cell().Element(CellStyle).Text("Total Paid");
-                        table.Cell().Element(CellStyle).AlignRight().Text(data.Invoice.Paid.ToString("N2"));
-                        table.Cell().Element(CellStyle).Text("Balance Due").Bold();
-                        table.Cell().Element(CellStyle).AlignRight().Text(data.Invoice.Due.ToString("N2")).Bold();
+                    }
+
+                    // Financial Summary
+                    col.Item().PaddingTop(15).Row(row =>
+                    {
+                        row.RelativeItem().PaddingTop(10).Column(c =>
+                        {
+                            c.Item().Text("Disclaimer").FontSize(12).SemiBold();
+                            c.Item().Text("This is an electronically generated summary. Final invoice may vary based on actual work performed. " +
+                                "All work carried out by MotoriTaller is subject to our standard terms and conditions.").FontSize(8).FontColor(Colors.Grey.Medium);
+
+                            c.Item().PaddingTop(10).Text("Legal Content").FontSize(12).SemiBold();
+                            c.Item().Text("MotoriTaller is a registered trademark. Any unauthorized reproduction of this document is prohibited. " +
+                                "Please keep this receipt for your records and warranty purposes.").FontSize(8).FontColor(Colors.Grey.Medium);
+                        });
+
+                        row.RelativeItem().AlignRight().Column(fcol =>
+                        {
+                            fcol.Item().Text("Financial Summary").FontSize(14).SemiBold();
+                            fcol.Item().Text($"Subtotal: {data.Invoice.Subtotal:N2}");
+                            if (data.Invoice.Discount > 0)
+                                fcol.Item().Text($"Discount ({data.Invoice.Discount}%): -{data.Invoice.DiscountAmount:N2}").FontColor(Colors.Red.Medium);
+                            if (data.Invoice.Tax > 0)
+                                fcol.Item().Text($"Tax ({data.Invoice.Tax}%): {data.Invoice.TaxAmount:N2}");
+
+                            fcol.Item().BorderTop(1).PaddingTop(5).Text($"Total: {data.Invoice.Total:N2}").FontSize(14).Bold();
+                            fcol.Item().Text($"Paid: {data.Invoice.Paid:N2}").FontColor(Colors.Green.Medium);
+                            fcol.Item().Text($"Due: {data.Invoice.Due:N2}").FontColor(Colors.Red.Medium).Bold();
+                        });
                     });
 
-                    col.Item().PaddingTop(20).AlignCenter().Column(cc => {
+                    // Online Access
+                    col.Item().PaddingTop(30).AlignCenter().Column(cc =>
+                    {
                         var barcode = new Barcode(payload, NetBarcode.Type.Code128, true);
                         cc.Item().Width(150).Image(barcode.GetByteArray());
                         cc.Item().Text(publicUrl).FontSize(8).FontColor(Colors.Blue.Medium);
                         cc.Item().Text("Scan to view full details online").FontSize(8);
                     });
+                });
+
+                page.Footer().AlignCenter().Text(x =>
+                {
+                    x.Span("Page ");
+                    x.CurrentPageNumber();
+                    x.Span(" - MotoriTaller - Professional Workshop Management");
                 });
             });
         });
