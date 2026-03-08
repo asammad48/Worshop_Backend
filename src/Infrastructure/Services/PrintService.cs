@@ -48,7 +48,7 @@ public sealed class PrintService : IPrintService
 
                     row.ConstantItem(100).Column(col => {
                          var barcode = new Barcode(data.Header.JobCardId.ToString(), NetBarcode.Type.Code128, true);
-                         col.Item().Image(barcode.GetByteArray(), ImageScaling.FitArea);
+                         col.Item().Image(barcode.GetByteArray()).FitArea();
                     });
                 });
 
@@ -307,8 +307,16 @@ public sealed class PrintService : IPrintService
                         col.Item().Text("Visit Summary").FontSize(14).Italic();
                     });
 
-                    // Dummy logo placeholder
-                    row.ConstantItem(60).Height(60).Background(Colors.Grey.Lighten3).AlignCenter().AlignMiddle().Text("LOGO").FontSize(12).FontColor(Colors.Grey.Medium);
+                    var logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "logo.png");
+                    if (File.Exists(logoPath))
+                    {
+                        row.ConstantItem(100).Image(logoPath).FitArea();
+                    }
+                    else
+                    {
+                        // Fallback to dummy if logo is missing in some environments
+                        row.ConstantItem(60).Height(60).Background(Colors.Grey.Lighten3).AlignCenter().AlignMiddle().Text("LOGO").FontSize(12).FontColor(Colors.Grey.Medium);
+                    }
                 });
 
                 page.Content().PaddingVertical(15).Column(col =>
@@ -401,11 +409,14 @@ public sealed class PrintService : IPrintService
                     });
                 });
 
-                page.Footer().AlignCenter().Text(x =>
-                {
-                    x.Span("Page ");
-                    x.CurrentPageNumber();
-                    x.Span(" - MotoriTaller - Professional Workshop Management");
+                page.Footer().Column(f => {
+                    f.Item().AlignCenter().PaddingBottom(5).Text("Thank you for choosing MotoriTaller!").FontSize(10).SemiBold().FontColor(Colors.Blue.Medium);
+                    f.Item().AlignCenter().Text(x =>
+                    {
+                        x.Span("Page ");
+                        x.CurrentPageNumber();
+                        x.Span(" - MotoriTaller - Professional Workshop Management");
+                    }).FontSize(8).FontColor(Colors.Grey.Medium);
                 });
             });
         });
