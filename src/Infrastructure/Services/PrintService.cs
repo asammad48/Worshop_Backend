@@ -409,14 +409,22 @@ public sealed class PrintService : IPrintService
                     });
                 });
 
-                page.Footer().Column(f => {
-                    f.Item().AlignCenter().PaddingBottom(5).Text("Thank you for choosing MotoriTaller!").FontSize(10).SemiBold().FontColor(Colors.Blue.Medium);
+                page.Footer().Column(f =>
+                {
+                    f.Item().AlignCenter().PaddingBottom(5)
+                        .Text("Thank you for choosing MotoriTaller!")
+                        .FontSize(10)
+                        .SemiBold()
+                        .FontColor(Colors.Blue.Medium);
+
                     f.Item().AlignCenter().Text(x =>
                     {
-                        x.Span("Page ");
-                        x.CurrentPageNumber();
-                        x.Span(" - MotoriTaller - Professional Workshop Management");
-                    }).FontSize(8).FontColor(Colors.Grey.Medium);
+                        x.Span("Page ").FontSize(8).FontColor(Colors.Grey.Medium);
+                        x.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Medium);
+                        x.Span(" - MotoriTaller - Professional Workshop Management")
+                            .FontSize(8)
+                            .FontColor(Colors.Grey.Medium);
+                    });
                 });
             });
         });
