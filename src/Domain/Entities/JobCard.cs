@@ -8,6 +8,8 @@ public sealed class JobCard : BaseEntity
     public Customer? Customer { get; set; }
     public Guid VehicleId { get; set; }
     public Vehicle? Vehicle { get; set; }
+    public Guid? DriverId { get; set; }
+    public Driver? Driver { get; set; }
     public JobCardStatus Status { get; set; } = JobCardStatus.NuevaSolicitud;
 
     public DateTimeOffset? EntryAt { get; set; }

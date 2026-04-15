@@ -137,6 +137,7 @@ public sealed class AppDbContext : DbContext
             j.Property(x => x.BranchId).HasColumnName("branch_id").IsRequired();
             j.Property(x => x.CustomerId).HasColumnName("customer_id").IsRequired();
             j.Property(x => x.VehicleId).HasColumnName("vehicle_id").IsRequired();
+            j.Property(x => x.DriverId).HasColumnName("driver_id");
             j.Property(x => x.Status).HasColumnName("status").HasConversion<short>().IsRequired();
             j.Property(x => x.EntryAt).HasColumnName("entry_at");
             j.Property(x => x.ExitAt).HasColumnName("exit_at");
@@ -151,6 +152,7 @@ public sealed class AppDbContext : DbContext
             j.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
             j.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
             j.HasOne(x => x.Vehicle).WithMany().HasForeignKey(x => x.VehicleId).OnDelete(DeleteBehavior.Restrict);
+            j.HasOne(x => x.Driver).WithMany().HasForeignKey(x => x.DriverId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<JobCardDiagnosisLog>(l =>

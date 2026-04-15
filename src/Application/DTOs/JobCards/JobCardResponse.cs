@@ -19,5 +19,7 @@ public sealed record JobCardResponse(
     DateTimeOffset? RequestedEta = null,
     DateTimeOffset? LatestEstimatedEta = null,
     decimal? LatestEstimatedPrice = null,
-    string? LatestDiagnosisSummary = null
+    string? LatestDiagnosisSummary = null,
+    Guid? DriverId = null,
+    string? DriverName = null
 );

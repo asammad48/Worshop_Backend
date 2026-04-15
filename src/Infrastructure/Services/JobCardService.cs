@@ -26,11 +26,19 @@ public sealed class JobCardService : IJobCardService
         var vehicle = await _db.Vehicles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == request.VehicleId && !x.IsDeleted, ct);
         if (vehicle is null) throw new NotFoundException("Vehicle not found");
 
+        if (request.DriverId.HasValue)
+        {
+            var driverExists = await _db.Drivers.AsNoTracking()
+                .AnyAsync(x => x.Id == request.DriverId.Value && !x.IsDeleted && x.CustomerId == vehicle.CustomerId, ct);
+            if (!driverExists) throw new NotFoundException("Driver not found for this customer");
+        }
+
         var job = new Domain.Entities.JobCard
         {
             BranchId = branchId,
             VehicleId = vehicle.Id,
             CustomerId = vehicle.CustomerId,
+            DriverId = request.DriverId,
             Mileage = request.Mileage,
             InitialReport = request.InitialReport?.Trim(),
             RequestedEta = request.RequestedEta,
@@ -89,7 +97,9 @@ public sealed class JobCardService : IJobCardService
                 x.RequestedEta,
                 x.LatestEstimatedEta,
                 x.LatestEstimatedPrice,
-                x.LatestDiagnosisSummary
+                x.LatestDiagnosisSummary,
+                x.DriverId,
+                x.Driver != null ? x.Driver.FullName : null
             ))
             .ToListAsync(ct);
         return new PageResponse<JobCardResponse>(items, total, page, size);
@@ -100,6 +110,7 @@ public sealed class JobCardService : IJobCardService
         var x = await _db.JobCards.AsNoTracking()
             .Include(j => j.Customer)
             .Include(j => j.Vehicle)
+            .Include(j => j.Driver)
             .Include(j => j.Branch)
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted && x.BranchId == branchId, ct);
         if (x is null) throw new NotFoundException("Job card not found");
@@ -117,7 +128,8 @@ public sealed class JobCardService : IJobCardService
             x.Id, x.BranchId, x.CustomerId, x.VehicleId, x.Status, x.EntryAt, x.ExitAt, x.Mileage, x.InitialReport, x.Diagnosis,
             x.Customer?.FullName, x.Vehicle?.Plate, x.Branch?.Name,
             station?.Name, station?.Code,
-            x.RequestedEta, x.LatestEstimatedEta, x.LatestEstimatedPrice, x.LatestDiagnosisSummary);
+            x.RequestedEta, x.LatestEstimatedEta, x.LatestEstimatedPrice, x.LatestDiagnosisSummary,
+            x.DriverId, x.Driver?.FullName);
     }
 
     public async Task<JobCardResponse> CheckInAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default)
@@ -292,6 +304,7 @@ public sealed class JobCardService : IJobCardService
         var job = await _db.JobCards
             .Include(x => x.Customer)
             .Include(x => x.Vehicle)
+            .Include(x => x.Driver)
             .Include(x => x.Branch)
             .FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted && x.BranchId == branchId, ct);
         if (job is null) throw new NotFoundException("Job card not found");
@@ -318,7 +331,9 @@ public sealed class JobCardService : IJobCardService
             x.RequestedEta,
             x.LatestEstimatedEta,
             x.LatestEstimatedPrice,
-            x.LatestDiagnosisSummary
+            x.LatestDiagnosisSummary,
+            x.DriverId,
+            x.Driver?.FullName
         );
 
     private async Task NotifyServiceWorkersAsync(
