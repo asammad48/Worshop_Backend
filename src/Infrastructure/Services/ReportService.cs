@@ -92,54 +92,89 @@ public sealed class ReportService : IReportService
 
     public async Task<JobCardReportResponse> GetJobCardReportAsync(Guid branchId, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
     {
-        var items = await _db.JobCards.AsNoTracking()
+        var rows = await _db.JobCards.AsNoTracking()
             .Where(x => !x.IsDeleted
                 && x.BranchId == branchId
                 && x.CreatedAt >= from
                 && x.CreatedAt <= to)
-            .Select(x => new JobCardReportItemResponse(
-                x.Id,
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(x => new
+            {
+                JobCardId = x.Id,
                 x.CreatedAt,
-                x.Status.ToString(),
+                JobCardStatus = x.Status,
                 x.EntryAt,
                 x.ExitAt,
                 x.Mileage,
                 x.CustomerId,
-                x.Customer != null ? x.Customer.FullName : null,
-                x.Customer != null ? x.Customer.CustomerType.ToString() : Domain.Enums.CustomerType.Simple.ToString(),
+                CustomerName = x.Customer != null ? x.Customer.FullName : null,
+                CustomerType = x.Customer != null ? x.Customer.CustomerType : Domain.Enums.CustomerType.Simple,
                 x.VehicleId,
-                x.Vehicle != null ? x.Vehicle.Plate : null,
-                x.Vehicle != null ? x.Vehicle.Make : null,
-                x.Vehicle != null ? x.Vehicle.Model : null,
-                x.Vehicle != null ? x.Vehicle.Year : null,
+                VehiclePlate = x.Vehicle != null ? x.Vehicle.Plate : null,
+                VehicleMake = x.Vehicle != null ? x.Vehicle.Make : null,
+                VehicleModel = x.Vehicle != null ? x.Vehicle.Model : null,
+                VehicleYear = x.Vehicle != null ? x.Vehicle.Year : null,
                 x.InitialReport,
                 x.Diagnosis,
                 x.LatestDiagnosisSummary,
                 x.RequestedEta,
                 x.LatestEstimatedEta,
                 x.LatestEstimatedPrice,
-                _db.JobCardWorkStationHistories
+                CurrentStationCode = _db.JobCardWorkStationHistories
                     .Where(h => !h.IsDeleted && h.JobCardId == x.Id)
                     .OrderByDescending(h => h.MovedAt)
                     .Select(h => h.WorkStation != null ? h.WorkStation.Code : null)
                     .FirstOrDefault(),
-                _db.JobCardWorkStationHistories
+                CurrentStationName = _db.JobCardWorkStationHistories
                     .Where(h => !h.IsDeleted && h.JobCardId == x.Id)
                     .OrderByDescending(h => h.MovedAt)
                     .Select(h => h.WorkStation != null ? h.WorkStation.Name : null)
                     .FirstOrDefault(),
-                _db.JobCardWorkStationHistories
+                LastStationMovedAt = _db.JobCardWorkStationHistories
                     .Where(h => !h.IsDeleted && h.JobCardId == x.Id)
                     .OrderByDescending(h => h.MovedAt)
                     .Select(h => (DateTimeOffset?)h.MovedAt)
                     .FirstOrDefault(),
-                _db.JobCardWorkStationHistories.Count(h => !h.IsDeleted && h.JobCardId == x.Id),
-                _db.JobCardDiagnosisLogs.Count(l => !l.IsDeleted && l.JobCardId == x.Id),
-                _db.Invoices.Where(i => !i.IsDeleted && i.JobCardId == x.Id).Select(i => (decimal?)i.Total).FirstOrDefault(),
-                _db.Invoices.Where(i => !i.IsDeleted && i.JobCardId == x.Id).Select(i => i.PaymentStatus.ToString()).FirstOrDefault()
-            ))
-            .OrderByDescending(x => x.CreatedAt)
+                StationMovementCount = _db.JobCardWorkStationHistories.Count(h => !h.IsDeleted && h.JobCardId == x.Id),
+                DiagnosisLogCount = _db.JobCardDiagnosisLogs.Count(l => !l.IsDeleted && l.JobCardId == x.Id),
+                InvoiceTotal = _db.Invoices.Where(i => !i.IsDeleted && i.JobCardId == x.Id).Select(i => (decimal?)i.Total).FirstOrDefault(),
+                InvoicePaymentStatus = _db.Invoices
+                    .Where(i => !i.IsDeleted && i.JobCardId == x.Id)
+                    .Select(i => (PaymentStatus?)i.PaymentStatus)
+                    .FirstOrDefault()
+            })
             .ToListAsync(ct);
+
+        var items = rows
+            .Select(x => new JobCardReportItemResponse(
+                x.JobCardId,
+                x.CreatedAt,
+                x.JobCardStatus.ToString(),
+                x.EntryAt,
+                x.ExitAt,
+                x.Mileage,
+                x.CustomerId,
+                x.CustomerName,
+                x.CustomerType.ToString(),
+                x.VehicleId,
+                x.VehiclePlate,
+                x.VehicleMake,
+                x.VehicleModel,
+                x.VehicleYear,
+                x.InitialReport,
+                x.Diagnosis,
+                x.LatestDiagnosisSummary,
+                x.RequestedEta,
+                x.LatestEstimatedEta,
+                x.LatestEstimatedPrice,
+                x.CurrentStationCode,
+                x.CurrentStationName,
+                x.LastStationMovedAt,
+                x.StationMovementCount,
+                x.DiagnosisLogCount,
+                x.InvoiceTotal,
+                x.InvoicePaymentStatus?.ToString()))
+            .ToList();
 
         return new JobCardReportResponse(items, items.Count, from, to);
     }
