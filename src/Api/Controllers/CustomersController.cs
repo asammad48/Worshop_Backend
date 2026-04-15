@@ -23,6 +23,10 @@ public sealed class CustomersController : ControllerBase
     public async Task<ActionResult<ApiResponse<PageResponse<CustomerResponse>>>> GetPaged([FromQuery] PageRequest req, CancellationToken ct)
         => ApiResponse<PageResponse<CustomerResponse>>.Ok(await _svc.GetPagedAsync(req, ct));
 
+    [HttpGet("fleet")]
+    public async Task<ActionResult<ApiResponse<PageResponse<CustomerResponse>>>> GetFleetCustomers([FromQuery] PageRequest req, CancellationToken ct)
+        => ApiResponse<PageResponse<CustomerResponse>>.Ok(await _svc.GetFleetPagedAsync(req, ct));
+
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<CustomerResponse>>> GetById(Guid id, CancellationToken ct)
         => ApiResponse<CustomerResponse>.Ok(await _svc.GetByIdAsync(id, ct));

@@ -1,6 +1,7 @@
 using Application.DTOs.Customers;
 using Application.Pagination;
 using Application.Services.Interfaces;
+using Domain.Enums;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Shared.Errors;
@@ -46,6 +47,29 @@ public sealed class CustomerService : ICustomerService
             .Skip((page - 1) * size).Take(size)
             .Select(x => new CustomerResponse(x.Id, x.FullName, x.Phone, x.Email, x.NationalId, x.CustomerType))
             .ToListAsync(ct);
+        return new PageResponse<CustomerResponse>(items, total, page, size);
+    }
+
+    public async Task<PageResponse<CustomerResponse>> GetFleetPagedAsync(PageRequest r, CancellationToken ct = default)
+    {
+        var q = _db.Customers.AsNoTracking()
+            .Where(x => !x.IsDeleted && x.CustomerType == CustomerType.Fleet);
+
+        if (!string.IsNullOrWhiteSpace(r.Search))
+        {
+            var s = r.Search.Trim().ToLower();
+            q = q.Where(x => x.FullName.ToLower().Contains(s) || (x.Phone != null && x.Phone.ToLower().Contains(s)));
+        }
+
+        var total = await q.CountAsync(ct);
+        var page = Math.Max(1, r.PageNumber);
+        var size = Math.Clamp(r.PageSize, 1, 100);
+
+        var items = await q.OrderBy(x => x.FullName)
+            .Skip((page - 1) * size).Take(size)
+            .Select(x => new CustomerResponse(x.Id, x.FullName, x.Phone, x.Email, x.NationalId, x.CustomerType))
+            .ToListAsync(ct);
+
         return new PageResponse<CustomerResponse>(items, total, page, size);
     }
 
