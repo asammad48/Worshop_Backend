@@ -188,6 +188,15 @@ public sealed class JobCardService : IJobCardService
         var job = await LoadBranchJob(branchId, id, ct);
         job.Diagnosis = diagnosis?.Trim();
         await _db.SaveChangesAsync(ct);
+
+        await NotifyServiceWorkersAsync(
+            actorUserId,
+            branchId,
+            job.Id,
+            "Job Card diagnosis updated",
+            $"Diagnosis was updated for vehicle {job.Vehicle?.Plate ?? "N/A"}.",
+            ct);
+
         return await GetByIdAsync(branchId, id, ct);
     }
 
@@ -215,6 +224,14 @@ public sealed class JobCardService : IJobCardService
             _db.JobCardDiagnosisLogs.Add(log);
             await _db.SaveChangesAsync(ct);
             await transaction.CommitAsync(ct);
+
+            await NotifyServiceWorkersAsync(
+                actorUserId,
+                branchId,
+                job.Id,
+                "New diagnosis entry added",
+                $"A diagnosis update was added for vehicle {job.Vehicle?.Plate ?? "N/A"}.",
+                ct);
 
             var user = await _db.Users.AsNoTracking().FirstAsync(u => u.Id == actorUserId, ct);
 
@@ -296,4 +313,34 @@ public sealed class JobCardService : IJobCardService
             x.LatestEstimatedPrice,
             x.LatestDiagnosisSummary
         );
+
+    private async Task NotifyServiceWorkersAsync(
+        Guid actorUserId,
+        Guid branchId,
+        Guid jobCardId,
+        string title,
+        string message,
+        CancellationToken ct)
+    {
+        var recipientIds = await _db.Users.AsNoTracking()
+            .Where(x => !x.IsDeleted
+                && x.IsActive
+                && x.BranchId == branchId
+                && x.Id != actorUserId
+                && (x.Role == UserRole.TECHNICIAN || x.Role == UserRole.BRANCH_MANAGER))
+            .Select(x => x.Id)
+            .ToListAsync(ct);
+
+        foreach (var userId in recipientIds)
+        {
+            await _notifications.CreateNotificationAsync(
+                "JOB_CARD",
+                title,
+                message,
+                "JOB_CARD",
+                jobCardId,
+                userId,
+                branchId);
+        }
+    }
 }

@@ -23,11 +23,12 @@ public sealed class CustomerService : ICustomerService
             FullName = r.FullName.Trim(),
             Phone = r.Phone?.Trim(),
             Email = r.Email?.Trim(),
-            NationalId = r.NationalId?.Trim()
+            NationalId = r.NationalId?.Trim(),
+            CustomerType = r.CustomerType
         };
         _db.Customers.Add(entity);
         await _db.SaveChangesAsync(ct);
-        return new CustomerResponse(entity.Id, entity.FullName, entity.Phone, entity.Email, entity.NationalId);
+        return new CustomerResponse(entity.Id, entity.FullName, entity.Phone, entity.Email, entity.NationalId, entity.CustomerType);
     }
 
     public async Task<PageResponse<CustomerResponse>> GetPagedAsync(PageRequest r, CancellationToken ct = default)
@@ -43,7 +44,7 @@ public sealed class CustomerService : ICustomerService
         var size = Math.Clamp(r.PageSize, 1, 100);
         var items = await q.OrderBy(x => x.FullName)
             .Skip((page - 1) * size).Take(size)
-            .Select(x => new CustomerResponse(x.Id, x.FullName, x.Phone, x.Email, x.NationalId))
+            .Select(x => new CustomerResponse(x.Id, x.FullName, x.Phone, x.Email, x.NationalId, x.CustomerType))
             .ToListAsync(ct);
         return new PageResponse<CustomerResponse>(items, total, page, size);
     }
@@ -52,6 +53,6 @@ public sealed class CustomerService : ICustomerService
     {
         var c = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
         if (c is null) throw new NotFoundException("Customer not found");
-        return new CustomerResponse(c.Id, c.FullName, c.Phone, c.Email, c.NationalId);
+        return new CustomerResponse(c.Id, c.FullName, c.Phone, c.Email, c.NationalId, c.CustomerType);
     }
 }

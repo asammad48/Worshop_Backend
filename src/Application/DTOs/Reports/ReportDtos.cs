@@ -20,3 +20,38 @@ public sealed record StationTimeResponse(
     int Year,
     int WeekNumber,
     int TotalMinutes);
+
+public sealed record JobCardReportResponse(
+    IReadOnlyList<JobCardReportItemResponse> Items,
+    int TotalCount,
+    DateTimeOffset From,
+    DateTimeOffset To);
+
+public sealed record JobCardReportItemResponse(
+    Guid JobCardId,
+    DateTimeOffset CreatedAt,
+    string Status,
+    DateTimeOffset? EntryAt,
+    DateTimeOffset? ExitAt,
+    int? Mileage,
+    Guid CustomerId,
+    string? CustomerName,
+    string CustomerType,
+    Guid VehicleId,
+    string? VehiclePlate,
+    string? VehicleMake,
+    string? VehicleModel,
+    int? VehicleYear,
+    string? InitialReport,
+    string? Diagnosis,
+    string? LatestDiagnosisSummary,
+    DateTimeOffset? RequestedEta,
+    DateTimeOffset? LatestEstimatedEta,
+    decimal? LatestEstimatedPrice,
+    string? CurrentStationCode,
+    string? CurrentStationName,
+    DateTimeOffset? LastStationMovedAt,
+    int StationMovementCount,
+    int DiagnosisLogCount,
+    decimal? InvoiceTotal,
+    string? InvoicePaymentStatus);

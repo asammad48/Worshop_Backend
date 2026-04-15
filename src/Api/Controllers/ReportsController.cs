@@ -42,4 +42,11 @@ public sealed class ReportsController : ControllerBase
         var branchId = User.GetBranchIdOrThrow();
         return ApiResponse<IReadOnlyList<StationTimeResponse>>.Ok(await _svc.GetStationTimeAsync(branchId, from, to, ct));
     }
+
+    [HttpGet("job-cards")]
+    public async Task<ActionResult<ApiResponse<JobCardReportResponse>>> JobCards([FromQuery] DateTimeOffset from, [FromQuery] DateTimeOffset to, CancellationToken ct)
+    {
+        var branchId = User.GetBranchIdOrThrow();
+        return ApiResponse<JobCardReportResponse>.Ok(await _svc.GetJobCardReportAsync(branchId, from, to, ct));
+    }
 }

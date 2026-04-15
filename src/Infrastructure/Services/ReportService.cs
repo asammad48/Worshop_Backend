@@ -89,4 +89,58 @@ public sealed class ReportService : IReportService
             .OrderBy(x => x.Year).ThenBy(x => x.WeekNumber).ThenBy(x => x.StationCode)
             .ToList();
     }
+
+    public async Task<JobCardReportResponse> GetJobCardReportAsync(Guid branchId, DateTimeOffset from, DateTimeOffset to, CancellationToken ct = default)
+    {
+        var items = await _db.JobCards.AsNoTracking()
+            .Where(x => !x.IsDeleted
+                && x.BranchId == branchId
+                && x.CreatedAt >= from
+                && x.CreatedAt <= to)
+            .Select(x => new JobCardReportItemResponse(
+                x.Id,
+                x.CreatedAt,
+                x.Status.ToString(),
+                x.EntryAt,
+                x.ExitAt,
+                x.Mileage,
+                x.CustomerId,
+                x.Customer != null ? x.Customer.FullName : null,
+                x.Customer != null ? x.Customer.CustomerType.ToString() : Domain.Enums.CustomerType.Simple.ToString(),
+                x.VehicleId,
+                x.Vehicle != null ? x.Vehicle.Plate : null,
+                x.Vehicle != null ? x.Vehicle.Make : null,
+                x.Vehicle != null ? x.Vehicle.Model : null,
+                x.Vehicle != null ? x.Vehicle.Year : null,
+                x.InitialReport,
+                x.Diagnosis,
+                x.LatestDiagnosisSummary,
+                x.RequestedEta,
+                x.LatestEstimatedEta,
+                x.LatestEstimatedPrice,
+                _db.JobCardWorkStationHistories
+                    .Where(h => !h.IsDeleted && h.JobCardId == x.Id)
+                    .OrderByDescending(h => h.MovedAt)
+                    .Select(h => h.WorkStation != null ? h.WorkStation.Code : null)
+                    .FirstOrDefault(),
+                _db.JobCardWorkStationHistories
+                    .Where(h => !h.IsDeleted && h.JobCardId == x.Id)
+                    .OrderByDescending(h => h.MovedAt)
+                    .Select(h => h.WorkStation != null ? h.WorkStation.Name : null)
+                    .FirstOrDefault(),
+                _db.JobCardWorkStationHistories
+                    .Where(h => !h.IsDeleted && h.JobCardId == x.Id)
+                    .OrderByDescending(h => h.MovedAt)
+                    .Select(h => (DateTimeOffset?)h.MovedAt)
+                    .FirstOrDefault(),
+                _db.JobCardWorkStationHistories.Count(h => !h.IsDeleted && h.JobCardId == x.Id),
+                _db.JobCardDiagnosisLogs.Count(l => !l.IsDeleted && l.JobCardId == x.Id),
+                _db.Invoices.Where(i => !i.IsDeleted && i.JobCardId == x.Id).Select(i => (decimal?)i.Total).FirstOrDefault(),
+                _db.Invoices.Where(i => !i.IsDeleted && i.JobCardId == x.Id).Select(i => i.PaymentStatus.ToString()).FirstOrDefault()
+            ))
+            .OrderByDescending(x => x.CreatedAt)
+            .ToListAsync(ct);
+
+        return new JobCardReportResponse(items, items.Count, from, to);
+    }
 }

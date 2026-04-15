@@ -1,6 +1,7 @@
 using Application.DTOs.WorkStations;
 using Application.Pagination;
 using Application.Services.Interfaces;
+using Domain.Enums;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Shared.Errors;
@@ -10,7 +11,13 @@ namespace Infrastructure.Services;
 public sealed class WorkStationService : IWorkStationService
 {
     private readonly AppDbContext _db;
-    public WorkStationService(AppDbContext db) { _db = db; }
+    private readonly INotificationService _notifications;
+
+    public WorkStationService(AppDbContext db, INotificationService notifications)
+    {
+        _db = db;
+        _notifications = notifications;
+    }
 
     public async Task<WorkStationResponse> CreateAsync(Guid branchId, WorkStationCreateRequest request, CancellationToken ct = default)
     {
@@ -82,6 +89,10 @@ public sealed class WorkStationService : IWorkStationService
 
         var ws = await _db.WorkStations.AsNoTracking().FirstOrDefaultAsync(x => x.Id == request.WorkStationId && x.BranchId == branchId && !x.IsDeleted, ct);
         if (ws is null) throw new NotFoundException("WorkStation not found");
+        var vehiclePlate = await _db.Vehicles.AsNoTracking()
+            .Where(x => x.Id == job.VehicleId && !x.IsDeleted)
+            .Select(x => x.Plate)
+            .FirstOrDefaultAsync(ct);
 
         var hist = new Domain.Entities.JobCardWorkStationHistory
         {
@@ -93,6 +104,45 @@ public sealed class WorkStationService : IWorkStationService
         };
         _db.JobCardWorkStationHistories.Add(hist);
         await _db.SaveChangesAsync(ct);
+
+        await NotifyServiceWorkersAsync(
+            actorUserId,
+            branchId,
+            jobCardId,
+            $"Job Card moved to {ws.Name} ({ws.Code})",
+            $"Vehicle {vehiclePlate ?? "N/A"} moved to workstation {ws.Name} ({ws.Code}).",
+            ct);
+
         return new JobCardStationHistoryResponse(hist.Id, hist.JobCardId, hist.WorkStationId, hist.MovedAt, hist.MovedByUserId, hist.Notes,"-","-");
+    }
+
+    private async Task NotifyServiceWorkersAsync(
+        Guid actorUserId,
+        Guid branchId,
+        Guid jobCardId,
+        string title,
+        string message,
+        CancellationToken ct)
+    {
+        var recipientIds = await _db.Users.AsNoTracking()
+            .Where(x => !x.IsDeleted
+                && x.IsActive
+                && x.BranchId == branchId
+                && x.Id != actorUserId
+                && (x.Role == UserRole.TECHNICIAN || x.Role == UserRole.BRANCH_MANAGER))
+            .Select(x => x.Id)
+            .ToListAsync(ct);
+
+        foreach (var userId in recipientIds)
+        {
+            await _notifications.CreateNotificationAsync(
+                "JOB_CARD",
+                title,
+                message,
+                "JOB_CARD",
+                jobCardId,
+                userId,
+                branchId);
+        }
     }
 }

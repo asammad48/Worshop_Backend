@@ -11,6 +11,7 @@ public sealed class AppDbContext : DbContext
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<User> Users => Set<User>();
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<Driver> Drivers => Set<Driver>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<JobCard> JobCards => Set<JobCard>();
     public DbSet<JobCardDiagnosisLog> JobCardDiagnosisLogs => Set<JobCardDiagnosisLog>();
@@ -97,7 +98,21 @@ public sealed class AppDbContext : DbContext
             c.Property(x => x.Phone).HasColumnName("phone");
             c.Property(x => x.Email).HasColumnName("email");
             c.Property(x => x.NationalId).HasColumnName("national_id");
+            c.Property(x => x.CustomerType).HasColumnName("customer_type").HasConversion<short>().HasDefaultValue(CustomerType.Simple).IsRequired();
             c.HasIndex(x => x.Phone).HasDatabaseName("ix_customers_phone");
+        });
+
+        modelBuilder.Entity<Driver>(d =>
+        {
+            d.ToTable("drivers");
+            d.HasKey(x => x.Id);
+            Base(d);
+            d.Property(x => x.CustomerId).HasColumnName("customer_id").IsRequired();
+            d.Property(x => x.FullName).HasColumnName("full_name").IsRequired();
+            d.Property(x => x.Phone).HasColumnName("phone");
+            d.Property(x => x.LicenseNumber).HasColumnName("license_number");
+            d.HasIndex(x => x.CustomerId).HasDatabaseName("ix_drivers_customer");
+            d.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Vehicle>(v =>
