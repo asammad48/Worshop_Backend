@@ -328,6 +328,7 @@ public sealed class PrintService : IPrintService
                         {
                             c.Item().Text(t => { t.Span("Plate: ").Bold(); t.Span(data.Plate); });
                             c.Item().Text(t => { t.Span("Customer: ").Bold(); t.Span(data.CustomerName); });
+                            c.Item().Text(t => { t.Span("Driver: ").Bold(); t.Span(string.IsNullOrWhiteSpace(data.DriverName) ? "N/A" : data.DriverName); });
                             c.Item().Text(t => { t.Span("Status: ").Bold(); t.Span(data.Status); });
                         });
                         row.RelativeItem().AlignRight().Column(c =>
