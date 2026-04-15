@@ -30,7 +30,13 @@ public sealed record PublicReceiptCommDto(
 public sealed record PublicJobCardReceiptResponse(
     Guid JobCardId,
     string Plate,
+    Guid CustomerId,
     string CustomerName,
+    string? CustomerPhone,
+    string? CustomerEmail,
+    string? CustomerNationalId,
+    string CustomerType,
+    string? DriverName,
     string BranchName,
     DateTimeOffset EntryAt,
     DateTimeOffset? ExitAt,

@@ -35,6 +35,7 @@ public sealed class ReceiptService : IReceiptService
             .Include(x => x.Branch)
             .Include(x => x.Customer)
             .Include(x => x.Vehicle)
+            .Include(x => x.Driver)
             .FirstOrDefaultAsync(x => x.Id == jobCardId && !x.IsDeleted, ct);
 
         if (job is null) throw new NotFoundException("Job card not found");
@@ -92,7 +93,13 @@ public sealed class ReceiptService : IReceiptService
         return new PublicJobCardReceiptResponse(
             job.Id,
             job.Vehicle?.Plate ?? "N/A",
+            job.CustomerId,
             job.Customer?.FullName ?? "N/A",
+            job.Customer?.Phone,
+            job.Customer?.Email,
+            job.Customer?.NationalId,
+            job.Customer?.CustomerType.ToString() ?? "Simple",
+            job.Driver?.FullName,
             job.Branch?.Name ?? "N/A",
             job.EntryAt ?? job.CreatedAt,
             job.ExitAt,
