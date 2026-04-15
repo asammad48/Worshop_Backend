@@ -7,7 +7,7 @@ namespace Application.Services.Interfaces;
 public interface IJobCardService
 {
     Task<JobCardResponse> CreateAsync(Guid actorUserId, Guid branchId, JobCardCreateRequest request, CancellationToken ct = default);
-    Task<PageResponse<JobCardResponse>> GetPagedAsync(Guid branchId, PageRequest request, CancellationToken ct = default);
+    Task<PageResponse<JobCardResponse>> GetPagedAsync(Guid branchId, JobCardPageRequest request, CancellationToken ct = default);
     Task<JobCardResponse> GetByIdAsync(Guid branchId, Guid id, CancellationToken ct = default);
 
     Task<JobCardResponse> CheckInAsync(Guid actorUserId, Guid branchId, Guid id, CancellationToken ct = default);

@@ -42,7 +42,7 @@ public sealed class JobCardsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<ApiResponse<PageResponse<JobCardResponse>>>> GetPaged([FromQuery] PageRequest req, CancellationToken ct)
+    public async Task<ActionResult<ApiResponse<PageResponse<JobCardResponse>>>> GetPaged([FromQuery] JobCardPageRequest req, CancellationToken ct)
     {
         var branchId = User.GetBranchIdOrThrow();
         return ApiResponse<PageResponse<JobCardResponse>>.Ok(await _jobs.GetPagedAsync(branchId, req, ct));

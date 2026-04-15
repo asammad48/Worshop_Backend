@@ -41,7 +41,7 @@ public sealed class JobCardService : IJobCardService
         return await GetByIdAsync(branchId, job.Id, ct);
     }
 
-    public async Task<PageResponse<JobCardResponse>> GetPagedAsync(Guid branchId, PageRequest request, CancellationToken ct = default)
+    public async Task<PageResponse<JobCardResponse>> GetPagedAsync(Guid branchId, JobCardPageRequest request, CancellationToken ct = default)
     {
         var q = _db.JobCards.AsNoTracking().Where(x => !x.IsDeleted && x.BranchId == branchId);
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -50,6 +50,13 @@ public sealed class JobCardService : IJobCardService
             // simple search on id string
             q = q.Where(x => x.Id.ToString().Contains(s));
         }
+
+        if (request.FromDate.HasValue)
+            q = q.Where(x => x.CreatedAt >= request.FromDate.Value);
+
+        if (request.ToDate.HasValue)
+            q = q.Where(x => x.CreatedAt <= request.ToDate.Value);
+
         var total = await q.CountAsync(ct);
         var page = Math.Max(1, request.PageNumber);
         var size = Math.Clamp(request.PageSize, 1, 100);
