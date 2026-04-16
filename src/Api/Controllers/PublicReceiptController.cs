@@ -27,7 +27,9 @@ public sealed class PublicReceiptController : ControllerBase
     [HttpGet("{jobCardId:guid}/print")]
     public async Task<IActionResult> Print(Guid jobCardId, [FromQuery] string? t, CancellationToken ct)
     {
-        var pdf = await _prints.RenderPublicReceiptPdfAsync(jobCardId, t, ct);
+        var acceptLanguage = Request.Headers["Accept-Language"].ToString();
+        var language = acceptLanguage.Trim().StartsWith("es", StringComparison.OrdinalIgnoreCase) ? "es" : "en";
+        var pdf = await _prints.RenderPublicReceiptPdfAsync(jobCardId, t, language, ct);
         return File(pdf, "application/pdf");
     }
 }

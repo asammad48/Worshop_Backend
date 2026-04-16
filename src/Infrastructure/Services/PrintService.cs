@@ -277,9 +277,11 @@ public sealed class PrintService : IPrintService
         return document.GeneratePdf();
     }
 
-    public async Task<byte[]> RenderPublicReceiptPdfAsync(Guid jobCardId, string? token, CancellationToken ct = default)
+    public async Task<byte[]> RenderPublicReceiptPdfAsync(Guid jobCardId, string? token, string language = "en", CancellationToken ct = default)
     {
         var data = await _receiptService.GetPublicReceiptAsync(jobCardId, token, ct);
+        var isSpanish = string.Equals(language, "es", StringComparison.OrdinalIgnoreCase);
+        string T(string en, string es) => isSpanish ? es : en;
 
         bool requireToken = _config.GetValue<bool>("PublicReceipt:RequireToken", false);
         string payload = jobCardId.ToString();
@@ -304,7 +306,7 @@ public sealed class PrintService : IPrintService
                     row.RelativeItem().Column(col =>
                     {
                         col.Item().Text(data.BranchName).FontSize(24).SemiBold().FontColor(Colors.Blue.Medium);
-                        col.Item().Text("Visit Summary").FontSize(14).Italic();
+                        col.Item().Text(T("Visit Summary", "Resumen de visita")).FontSize(14).Italic();
                     });
 
                     var logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "logo.png");
@@ -326,23 +328,23 @@ public sealed class PrintService : IPrintService
                     {
                         row.RelativeItem().Column(c =>
                         {
-                            c.Item().Text(t => { t.Span("Plate: ").Bold(); t.Span(data.Plate); });
-                            c.Item().Text(t => { t.Span("Customer: ").Bold(); t.Span(data.CustomerName); });
-                            c.Item().Text(t => { t.Span("Driver: ").Bold(); t.Span(string.IsNullOrWhiteSpace(data.DriverName) ? "N/A" : data.DriverName); });
-                            c.Item().Text(t => { t.Span("Status: ").Bold(); t.Span(data.Status); });
+                            c.Item().Text(t => { t.Span($"{T("Plate", "Matrícula")}: ").Bold(); t.Span(data.Plate); });
+                            c.Item().Text(t => { t.Span($"{T("Customer", "Cliente")}: ").Bold(); t.Span(data.CustomerName); });
+                            c.Item().Text(t => { t.Span($"{T("Driver", "Conductor")}: ").Bold(); t.Span(string.IsNullOrWhiteSpace(data.DriverName) ? "N/A" : data.DriverName); });
+                            c.Item().Text(t => { t.Span($"{T("Status", "Estado")}: ").Bold(); t.Span(data.Status); });
                         });
                         row.RelativeItem().AlignRight().Column(c =>
                         {
-                            c.Item().Text(t => { t.Span("Entry: ").Bold(); t.Span(data.EntryAt.ToString("g")); });
+                            c.Item().Text(t => { t.Span($"{T("Entry", "Entrada")}: ").Bold(); t.Span(data.EntryAt.ToString("g")); });
                             if (data.ExitAt.HasValue)
-                                c.Item().Text(t => { t.Span("Exit: ").Bold(); t.Span(data.ExitAt.Value.ToString("g")); });
+                                c.Item().Text(t => { t.Span($"{T("Exit", "Salida")}: ").Bold(); t.Span(data.ExitAt.Value.ToString("g")); });
                         });
                     });
 
                     // Items if available
                     if (data.Invoice.HasInvoice && data.Invoice.Lines.Any())
                     {
-                        col.Item().PaddingTop(15).Text("Service Details").FontSize(14).SemiBold();
+                        col.Item().PaddingTop(15).Text(T("Service Details", "Detalles del servicio")).FontSize(14).SemiBold();
                         col.Item().Table(table =>
                         {
                             table.ColumnsDefinition(columns =>
@@ -355,10 +357,10 @@ public sealed class PrintService : IPrintService
 
                             table.Header(header =>
                             {
-                                header.Cell().Element(CellStyle).Text("Description");
-                                header.Cell().Element(CellStyle).AlignRight().Text("Qty");
-                                header.Cell().Element(CellStyle).AlignRight().Text("Unit Price");
-                                header.Cell().Element(CellStyle).AlignRight().Text("Amount");
+                                header.Cell().Element(CellStyle).Text(T("Description", "Descripción"));
+                                header.Cell().Element(CellStyle).AlignRight().Text(T("Qty", "Cant."));
+                                header.Cell().Element(CellStyle).AlignRight().Text(T("Unit Price", "Precio unit."));
+                                header.Cell().Element(CellStyle).AlignRight().Text(T("Amount", "Importe"));
                             });
 
                             foreach (var line in data.Invoice.Lines)
@@ -376,27 +378,29 @@ public sealed class PrintService : IPrintService
                     {
                         row.RelativeItem().PaddingTop(10).Column(c =>
                         {
-                            c.Item().Text("Disclaimer").FontSize(12).SemiBold();
-                            c.Item().Text("This is an electronically generated summary. Final invoice may vary based on actual work performed. " +
-                                "All work carried out by MotoriTaller is subject to our standard terms and conditions.").FontSize(8).FontColor(Colors.Grey.Medium);
+                            c.Item().Text(T("Disclaimer", "Descargo de responsabilidad")).FontSize(12).SemiBold();
+                            c.Item().Text(T(
+                                "This is an electronically generated summary. Final invoice may vary based on actual work performed. All work carried out by MotoriTaller is subject to our standard terms and conditions.",
+                                "Este es un resumen generado electrónicamente. La factura final puede variar según el trabajo realizado. Todo el trabajo realizado por MotoriTaller está sujeto a nuestros términos y condiciones estándar.")).FontSize(8).FontColor(Colors.Grey.Medium);
 
-                            c.Item().PaddingTop(10).Text("Legal Content").FontSize(12).SemiBold();
-                            c.Item().Text("MotoriTaller is a registered trademark. Any unauthorized reproduction of this document is prohibited. " +
-                                "Please keep this receipt for your records and warranty purposes.").FontSize(8).FontColor(Colors.Grey.Medium);
+                            c.Item().PaddingTop(10).Text(T("Legal Content", "Contenido legal")).FontSize(12).SemiBold();
+                            c.Item().Text(T(
+                                "MotoriTaller is a registered trademark. Any unauthorized reproduction of this document is prohibited. Please keep this receipt for your records and warranty purposes.",
+                                "MotoriTaller es una marca registrada. Cualquier reproducción no autorizada de este documento está prohibida. Conserve este recibo para sus registros y fines de garantía.")).FontSize(8).FontColor(Colors.Grey.Medium);
                         });
 
                         row.RelativeItem().AlignRight().Column(fcol =>
                         {
-                            fcol.Item().Text("Financial Summary").FontSize(14).SemiBold();
-                            fcol.Item().Text($"Subtotal: {data.Invoice.Subtotal:N2}");
+                            fcol.Item().Text(T("Financial Summary", "Resumen financiero")).FontSize(14).SemiBold();
+                            fcol.Item().Text($"{T("Subtotal", "Subtotal")}: {data.Invoice.Subtotal:N2}");
                             if (data.Invoice.Discount > 0)
-                                fcol.Item().Text($"Discount ({data.Invoice.Discount}%): -{data.Invoice.DiscountAmount:N2}").FontColor(Colors.Red.Medium);
+                                fcol.Item().Text($"{T("Discount", "Descuento")} ({data.Invoice.Discount}%): -{data.Invoice.DiscountAmount:N2}").FontColor(Colors.Red.Medium);
                             if (data.Invoice.Tax > 0)
-                                fcol.Item().Text($"Tax ({data.Invoice.Tax}%): {data.Invoice.TaxAmount:N2}");
+                                fcol.Item().Text($"{T("Tax", "Impuesto")} ({data.Invoice.Tax}%): {data.Invoice.TaxAmount:N2}");
 
-                            fcol.Item().BorderTop(1).PaddingTop(5).Text($"Total: {data.Invoice.Total:N2}").FontSize(14).Bold();
-                            fcol.Item().Text($"Paid: {data.Invoice.Paid:N2}").FontColor(Colors.Green.Medium);
-                            fcol.Item().Text($"Due: {data.Invoice.Due:N2}").FontColor(Colors.Red.Medium).Bold();
+                            fcol.Item().BorderTop(1).PaddingTop(5).Text($"{T("Total", "Total")}: {data.Invoice.Total:N2}").FontSize(14).Bold();
+                            fcol.Item().Text($"{T("Paid", "Pagado")}: {data.Invoice.Paid:N2}").FontColor(Colors.Green.Medium);
+                            fcol.Item().Text($"{T("Due", "Pendiente")}: {data.Invoice.Due:N2}").FontColor(Colors.Red.Medium).Bold();
                         });
                     });
 
@@ -406,23 +410,23 @@ public sealed class PrintService : IPrintService
                         var barcode = new Barcode(payload, NetBarcode.Type.Code128, true);
                         cc.Item().Width(150).Image(barcode.GetByteArray());
                         cc.Item().Text(publicUrl).FontSize(8).FontColor(Colors.Blue.Medium);
-                        cc.Item().Text("Scan to view full details online").FontSize(8);
+                        cc.Item().Text(T("Scan to view full details online", "Escanea para ver todos los detalles en línea")).FontSize(8);
                     });
                 });
 
                 page.Footer().Column(f =>
                 {
                     f.Item().AlignCenter().PaddingBottom(5)
-                        .Text("Thank you for choosing MotoriTaller!")
+                        .Text(T("Thank you for choosing MotoriTaller!", "¡Gracias por elegir MotoriTaller!"))
                         .FontSize(10)
                         .SemiBold()
                         .FontColor(Colors.Blue.Medium);
 
                     f.Item().AlignCenter().Text(x =>
                     {
-                        x.Span("Page ").FontSize(8).FontColor(Colors.Grey.Medium);
+                        x.Span(T("Page ", "Página ")).FontSize(8).FontColor(Colors.Grey.Medium);
                         x.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Medium);
-                        x.Span(" - MotoriTaller - Professional Workshop Management")
+                        x.Span(T(" - MotoriTaller - Professional Workshop Management", " - MotoriTaller - Gestión profesional de talleres"))
                             .FontSize(8)
                             .FontColor(Colors.Grey.Medium);
                     });
