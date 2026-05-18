@@ -110,7 +110,7 @@ public sealed class PublicReportService : IPublicReportService
     {
         if (!entryAt.HasValue) return "Pending";
         if (entryAt.HasValue && exitAt.HasValue) return "Completed";
-        if (taskStatus == JobTaskStatus.Completed) return "Completed";
+        if (taskStatus == JobTaskStatus.Done) return "Completed";
         return "InProgress";
     }
 
