@@ -58,6 +58,12 @@ public sealed record JobCardPrintTimeLogDto(
     DateTimeOffset? EndedAt,
     int DurationMinutes);
 
+public sealed record JobCardTaskWorkerTimeDto(
+    string TaskTitle,
+    string WorkerEmail,
+    int TotalMinutes,
+    decimal TotalHours);
+
 public sealed record JobCardPrintCommunicationDto(
     string Type,
     string Direction,
@@ -82,7 +88,11 @@ public sealed record JobCardPrintResponse(
     string? LatestDiagnosisSummary,
     DateTimeOffset? RequestedEta,
     DateTimeOffset? LatestEstimatedEta,
+    string? CurrentGarage,
+    int TotalPartRequests,
+    int TotalPartsUsed,
     IReadOnlyList<JobCardPrintTaskDto> Tasks,
+    IReadOnlyList<JobCardTaskWorkerTimeDto> TaskWorkerTimes,
     IReadOnlyList<JobCardPrintPartDto> PartsUsed,
     IReadOnlyList<JobCardPrintPartRequestDto> PartRequests,
     IReadOnlyList<JobCardPrintRoadblockerDto> Roadblockers,

@@ -84,6 +84,26 @@ public sealed class PublicReportService : IPublicReportService
                               select new JobCardPrintTimeLogDto(u.Email, t.Title, tl.StartAt, tl.EndAt, tl.TotalMinutes))
                               .ToListAsync(ct);
 
+        var taskWorkerTimes = await (from tl in _db.JobCardTimeLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+                                     join u in _db.Users on tl.TechnicianUserId equals u.Id
+                                     join t in _db.JobTasks on tl.JobTaskId equals t.Id into tasks_
+                                     from t in tasks_.DefaultIfEmpty()
+                                     group tl by new { TaskTitle = t != null ? t.Title : "Unknown Task", WorkerEmail = u.Email } into g
+                                     select new JobCardTaskWorkerTimeDto(
+                                         g.Key.TaskTitle,
+                                         g.Key.WorkerEmail,
+                                         g.Sum(x => x.TotalMinutes),
+                                         Math.Round(g.Sum(x => x.TotalMinutes) / 60m, 2)))
+                                     .OrderBy(x => x.TaskTitle)
+                                     .ThenBy(x => x.WorkerEmail)
+                                     .ToListAsync(ct);
+
+        var currentGarage = await _db.JobCardWorkStationHistories
+            .Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+            .OrderByDescending(x => x.MovedAt)
+            .Select(x => x.WorkStation != null ? x.WorkStation.Name : null)
+            .FirstOrDefaultAsync(ct);
+
         var communications = await (from c in _db.CommunicationLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
                                     join u in _db.Users on c.CreatedByUserId equals u.Id
                                     select new JobCardPrintCommunicationDto(c.Type.ToString(), c.Direction.ToString(), c.Summary, c.Details, c.OccurredAt, u.Email))
@@ -103,7 +123,7 @@ public sealed class PublicReportService : IPublicReportService
             (invoice?.Total ?? 0) - paid
         );
 
-        return new JobCardPrintResponse(header, job.Diagnosis, job.LatestDiagnosisSummary, job.RequestedEta, job.LatestEstimatedEta, tasks, partsUsed, partRequests, roadblockers, timeLogs, communications, financial);
+        return new JobCardPrintResponse(header, job.Diagnosis, job.LatestDiagnosisSummary, job.RequestedEta, job.LatestEstimatedEta, currentGarage, partRequests.Count, partsUsed.Count, tasks, taskWorkerTimes, partsUsed, partRequests, roadblockers, timeLogs, communications, financial);
     }
 
     private static string ComputeDisplayStatus(DateTimeOffset? entryAt, DateTimeOffset? exitAt, JobTaskStatus taskStatus)

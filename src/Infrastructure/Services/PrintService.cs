@@ -52,6 +52,8 @@ public sealed class PrintService : IPrintService
                     col.Item().Text(data.Diagnosis ?? "-");
                     col.Item().Text($"Latest Summary: {data.LatestDiagnosisSummary ?? "-"}");
                     col.Item().Text($"Requested ETA: {data.RequestedEta?.ToString("g") ?? "-"} | Latest ETA: {data.LatestEstimatedEta?.ToString("g") ?? "-"}");
+                    col.Item().Text($"Current Garage: {data.CurrentGarage ?? "-"}");
+                    col.Item().Text($"Part Requests: {data.TotalPartRequests} | Parts Used: {data.TotalPartsUsed}");
 
                     col.Item().PaddingTop(10).Text("Job Task Checklist").FontSize(14).SemiBold();
                     col.Item().Table(table =>
@@ -81,6 +83,37 @@ public sealed class PrintService : IPrintService
                             table.Cell().Element(CellStyle).Text(task.CompletedAt?.ToString("g") ?? "-");
                         }
                     });
+
+                    if (data.TaskWorkerTimes.Any())
+                    {
+                        col.Item().PaddingTop(10).Text("Worker Time Spent Per Task").FontSize(14).SemiBold();
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(columns =>
+                            {
+                                columns.RelativeColumn();
+                                columns.RelativeColumn();
+                                columns.ConstantColumn(120);
+                                columns.ConstantColumn(90);
+                            });
+
+                            table.Header(header =>
+                            {
+                                header.Cell().Element(CellStyle).Text("Task");
+                                header.Cell().Element(CellStyle).Text("Worker");
+                                header.Cell().Element(CellStyle).Text("Minutes");
+                                header.Cell().Element(CellStyle).Text("Hours");
+                            });
+
+                            foreach (var wt in data.TaskWorkerTimes)
+                            {
+                                table.Cell().Element(CellStyle).Text(wt.TaskTitle);
+                                table.Cell().Element(CellStyle).Text(wt.WorkerEmail);
+                                table.Cell().Element(CellStyle).Text(wt.TotalMinutes.ToString());
+                                table.Cell().Element(CellStyle).Text(wt.TotalHours.ToString("N2"));
+                            }
+                        });
+                    }
                 });
             });
         });
@@ -568,6 +601,26 @@ public sealed class PrintService : IPrintService
                                     select new JobCardPrintCommunicationDto(c.Type.ToString(), c.Direction.ToString(), c.Summary, c.Details, c.OccurredAt, u.Email))
                                     .ToListAsync(ct);
 
+        var taskWorkerTimes = await (from tl in _db.JobCardTimeLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+                                     join u in _db.Users on tl.TechnicianUserId equals u.Id
+                                     join t in _db.JobTasks on tl.JobTaskId equals t.Id into tasks_
+                                     from t in tasks_.DefaultIfEmpty()
+                                     group tl by new { TaskTitle = t != null ? t.Title : "Unknown Task", WorkerEmail = u.Email } into g
+                                     select new JobCardTaskWorkerTimeDto(
+                                         g.Key.TaskTitle,
+                                         g.Key.WorkerEmail,
+                                         g.Sum(x => x.TotalMinutes),
+                                         Math.Round(g.Sum(x => x.TotalMinutes) / 60m, 2)))
+                                     .OrderBy(x => x.TaskTitle)
+                                     .ThenBy(x => x.WorkerEmail)
+                                     .ToListAsync(ct);
+
+        var currentGarage = await _db.JobCardWorkStationHistories
+            .Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+            .OrderByDescending(x => x.MovedAt)
+            .Select(x => x.WorkStation != null ? x.WorkStation.Name : null)
+            .FirstOrDefaultAsync(ct);
+
         var invoice = await _db.Invoices.FirstOrDefaultAsync(x => x.JobCardId == jobCardId && !x.IsDeleted, ct);
         decimal paid = invoice == null ? 0 : await _db.Payments.Where(x => x.InvoiceId == invoice.Id && !x.IsDeleted).SumAsync(x => x.Amount, ct);
 
@@ -582,6 +635,6 @@ public sealed class PrintService : IPrintService
             (invoice?.Total ?? 0) - paid
         );
 
-        return new JobCardPrintResponse(header, job.Diagnosis, job.LatestDiagnosisSummary, job.RequestedEta, job.LatestEstimatedEta, tasks, partsUsed, partRequests, roadblockers, timeLogs, communications, financial);
+        return new JobCardPrintResponse(header, job.Diagnosis, job.LatestDiagnosisSummary, job.RequestedEta, job.LatestEstimatedEta, currentGarage, partRequests.Count, partsUsed.Count, tasks, taskWorkerTimes, partsUsed, partRequests, roadblockers, timeLogs, communications, financial);
     }
 }
