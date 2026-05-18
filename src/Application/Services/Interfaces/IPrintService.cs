@@ -7,4 +7,5 @@ public interface IPrintService
     Task<byte[]> RenderJobCardPdfAsync(Guid jobCardId, Guid branchId, CancellationToken ct = default);
     Task<byte[]> RenderInvoicePdfAsync(Guid invoiceId, Guid branchId, CancellationToken ct = default);
     Task<byte[]> RenderPublicReceiptPdfAsync(Guid jobCardId, string? token, string language = "en", CancellationToken ct = default);
+    Task<byte[]> RenderPublicFullReportPdfAsync(Guid jobCardId, string? token, CancellationToken ct = default);
 }

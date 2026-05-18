@@ -17,6 +17,7 @@ public sealed record JobCardPrintTaskDto(
     Guid TaskId,
     string Title,
     string Status,
+    string DisplayStatus,
     string? AssignedToEmail,
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
@@ -77,6 +78,10 @@ public sealed record JobCardPrintFinancialDto(
 
 public sealed record JobCardPrintResponse(
     JobCardPrintHeaderDto Header,
+    string? Diagnosis,
+    string? LatestDiagnosisSummary,
+    DateTimeOffset? RequestedEta,
+    DateTimeOffset? LatestEstimatedEta,
     IReadOnlyList<JobCardPrintTaskDto> Tasks,
     IReadOnlyList<JobCardPrintPartDto> PartsUsed,
     IReadOnlyList<JobCardPrintPartRequestDto> PartRequests,

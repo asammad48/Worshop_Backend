@@ -16,14 +16,76 @@ public sealed class PrintService : IPrintService
 {
     private readonly AppDbContext _db;
     private readonly IReceiptService _receiptService;
+    private readonly IPublicReportService _publicReportService;
     private readonly IConfiguration _config;
 
-    public PrintService(AppDbContext db, IReceiptService receiptService, IConfiguration config)
+    public PrintService(AppDbContext db, IReceiptService receiptService, IPublicReportService publicReportService, IConfiguration config)
     {
         _db = db;
         _receiptService = receiptService;
+        _publicReportService = publicReportService;
         _config = config;
         QuestPDF.Settings.License = LicenseType.Community;
+    }
+
+    public async Task<byte[]> RenderPublicFullReportPdfAsync(Guid jobCardId, string? token, CancellationToken ct = default)
+    {
+        var data = await _publicReportService.GetPublicFullJobCardReportAsync(jobCardId, token, ct);
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Margin(1, Unit.Centimetre);
+                page.PageColor(Colors.White);
+                page.DefaultTextStyle(x => x.FontSize(10));
+
+                page.Header().Column(col =>
+                {
+                    col.Item().Text($"Job Card Full Report: {data.Header.JobCardNo}").FontSize(18).SemiBold().FontColor(Colors.Blue.Darken2);
+                    col.Item().Text($"Branch: {data.Header.BranchName}  |  Plate: {data.Header.Plate}  |  Customer: {data.Header.CustomerName}");
+                });
+
+                page.Content().PaddingTop(10).Column(col =>
+                {
+                    col.Item().Text("Diagnosis").Bold();
+                    col.Item().Text(data.Diagnosis ?? "-");
+                    col.Item().Text($"Latest Summary: {data.LatestDiagnosisSummary ?? "-"}");
+                    col.Item().Text($"Requested ETA: {data.RequestedEta?.ToString("g") ?? "-"} | Latest ETA: {data.LatestEstimatedEta?.ToString("g") ?? "-"}");
+
+                    col.Item().PaddingTop(10).Text("Job Task Checklist").FontSize(14).SemiBold();
+                    col.Item().Table(table =>
+                    {
+                        table.ColumnsDefinition(columns =>
+                        {
+                            columns.ConstantColumn(24);
+                            columns.RelativeColumn();
+                            columns.ConstantColumn(110);
+                            columns.ConstantColumn(150);
+                        });
+
+                        table.Header(header =>
+                        {
+                            header.Cell().Element(CellStyle).Text("Done");
+                            header.Cell().Element(CellStyle).Text("Task");
+                            header.Cell().Element(CellStyle).Text("Status");
+                            header.Cell().Element(CellStyle).Text("Completed At");
+                        });
+
+                        foreach (var task in data.Tasks)
+                        {
+                            var isDone = string.Equals(task.DisplayStatus, "Completed", StringComparison.OrdinalIgnoreCase);
+                            table.Cell().Element(CellStyle).AlignCenter().Text(isDone ? "☑" : "☐");
+                            table.Cell().Element(CellStyle).Text(task.Title);
+                            table.Cell().Element(CellStyle).Text(task.DisplayStatus);
+                            table.Cell().Element(CellStyle).Text(task.CompletedAt?.ToString("g") ?? "-");
+                        }
+                    });
+                });
+            });
+        });
+
+        return document.GeneratePdf();
     }
 
     public async Task<byte[]> RenderJobCardPdfAsync(Guid jobCardId, Guid branchId, CancellationToken ct = default)
@@ -306,7 +368,7 @@ public sealed class PrintService : IPrintService
                     row.RelativeItem().Column(col =>
                     {
                         col.Item().Text(data.BranchName).FontSize(24).SemiBold().FontColor(Colors.Blue.Medium);
-                        col.Item().Text(T("Visit Summary", "Resumen de visita")).FontSize(14).Italic();
+                        col.Item().Text(T("Factura / Service Invoice", "Factura / Resumen de servicio")).FontSize(14).Italic();
                     });
 
                     var logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "logo.png");
@@ -344,7 +406,7 @@ public sealed class PrintService : IPrintService
                     // Items if available
                     if (data.Invoice.HasInvoice && data.Invoice.Lines.Any())
                     {
-                        col.Item().PaddingTop(15).Text(T("Service Details", "Detalles del servicio")).FontSize(14).SemiBold();
+                        col.Item().PaddingTop(15).Text(T("Factura Line Items", "Líneas de factura")).FontSize(14).SemiBold();
                         col.Item().Table(table =>
                         {
                             table.ColumnsDefinition(columns =>
@@ -469,7 +531,7 @@ public sealed class PrintService : IPrintService
         var tasks = await (from t in _db.JobTasks.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
                            join u in _db.Users on t.StartedByUserId equals u.Id into users
                            from u in users.DefaultIfEmpty()
-                           select new JobCardPrintTaskDto(t.Id, t.Title, t.Status.ToString(), u.Email, t.StartedAt, t.EndedAt, t.Notes))
+                           select new JobCardPrintTaskDto(t.Id, t.Title, t.Status.ToString(), t.Status.ToString(), u.Email, t.StartedAt, t.EndedAt, t.Notes))
                            .ToListAsync(ct);
 
         var partsUsed = await (from u in _db.JobCardPartUsages.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
@@ -520,6 +582,6 @@ public sealed class PrintService : IPrintService
             (invoice?.Total ?? 0) - paid
         );
 
-        return new JobCardPrintResponse(header, tasks, partsUsed, partRequests, roadblockers, timeLogs, communications, financial);
+        return new JobCardPrintResponse(header, job.Diagnosis, job.LatestDiagnosisSummary, job.RequestedEta, job.LatestEstimatedEta, tasks, partsUsed, partRequests, roadblockers, timeLogs, communications, financial);
     }
 }

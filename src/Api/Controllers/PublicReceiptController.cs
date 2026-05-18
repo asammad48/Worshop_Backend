@@ -32,4 +32,11 @@ public sealed class PublicReceiptController : ControllerBase
         var pdf = await _prints.RenderPublicReceiptPdfAsync(jobCardId, t, language, ct);
         return File(pdf, "application/pdf");
     }
+
+    [HttpGet("{jobCardId:guid}/full-report")]
+    public async Task<IActionResult> FullReport(Guid jobCardId, [FromQuery] string? t, CancellationToken ct)
+    {
+        var pdf = await _prints.RenderPublicFullReportPdfAsync(jobCardId, t, ct);
+        return File(pdf, "application/pdf");
+    }
 }
