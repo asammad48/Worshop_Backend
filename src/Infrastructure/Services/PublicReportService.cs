@@ -84,19 +84,28 @@ public sealed class PublicReportService : IPublicReportService
                               select new JobCardPrintTimeLogDto(u.Email, t.Title, tl.StartAt, tl.EndAt, tl.TotalMinutes))
                               .ToListAsync(ct);
 
-        var taskWorkerTimes = await (from tl in _db.JobCardTimeLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
-                                     join u in _db.Users on tl.TechnicianUserId equals u.Id
-                                     join t in _db.JobTasks on tl.JobTaskId equals t.Id into tasks_
-                                     from t in tasks_.DefaultIfEmpty()
-                                     group tl by new { TaskTitle = t != null ? t.Title : "Unknown Task", WorkerEmail = u.Email } into g
-                                     select new JobCardTaskWorkerTimeDto(
-                                         g.Key.TaskTitle,
-                                         g.Key.WorkerEmail,
-                                         g.Sum(x => x.TotalMinutes),
-                                         Math.Round(g.Sum(x => x.TotalMinutes) / 60m, 2)))
-                                     .OrderBy(x => x.TaskTitle)
-                                     .ThenBy(x => x.WorkerEmail)
-                                     .ToListAsync(ct);
+        var taskWorkerTimeRows = await (from tl in _db.JobCardTimeLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+                                        join u in _db.Users on tl.TechnicianUserId equals u.Id
+                                        join t in _db.JobTasks on tl.JobTaskId equals t.Id into tasks_
+                                        from t in tasks_.DefaultIfEmpty()
+                                        group tl by new { TaskTitle = t != null ? t.Title : "Unknown Task", WorkerEmail = u.Email } into g
+                                        select new
+                                        {
+                                            g.Key.TaskTitle,
+                                            g.Key.WorkerEmail,
+                                            TotalMinutes = g.Sum(x => x.TotalMinutes)
+                                        })
+                                        .OrderBy(x => x.TaskTitle)
+                                        .ThenBy(x => x.WorkerEmail)
+                                        .ToListAsync(ct);
+
+        var taskWorkerTimes = taskWorkerTimeRows
+            .Select(x => new JobCardTaskWorkerTimeDto(
+                x.TaskTitle,
+                x.WorkerEmail,
+                x.TotalMinutes,
+                Math.Round(x.TotalMinutes / 60m, 2)))
+            .ToList();
 
         var currentGarage = await _db.JobCardWorkStationHistories
             .Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
