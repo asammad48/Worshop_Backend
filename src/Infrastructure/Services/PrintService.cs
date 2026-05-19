@@ -36,85 +36,334 @@ public sealed class PrintService : IPrintService
         {
             container.Page(page =>
             {
-                page.Margin(1, Unit.Centimetre);
+                page.Size(PageSizes.A4);
+                page.Margin(1.2f, Unit.Centimetre);
                 page.PageColor(Colors.White);
-                page.DefaultTextStyle(x => x.FontSize(10));
+                page.DefaultTextStyle(x => x.FontSize(9));
 
+                // ── HEADER ─────────────────────────────────────────────────
                 page.Header().Column(col =>
                 {
-                    col.Item().Text($"Job Card Full Report: {data.Header.JobCardNo}").FontSize(18).SemiBold().FontColor(Colors.Blue.Darken2);
-                    col.Item().Text($"Branch: {data.Header.BranchName}  |  Plate: {data.Header.Plate}  |  Customer: {data.Header.CustomerName}");
+                    // Dark title bar
+                    col.Item()
+                        .Background(Colors.Blue.Darken4)
+                        .Padding(12)
+                        .Row(row =>
+                        {
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text("WORKSHOP JOB CARD REPORT")
+                                    .FontSize(15).Bold().FontColor(Colors.White);
+                                c.Item().Text($"Ref: {data.Header.JobCardNo}  |  Status: {data.Header.Status}")
+                                    .FontSize(8).FontColor(Colors.Blue.Lighten3);
+                            });
+                            row.ConstantItem(160).Column(c =>
+                            {
+                                c.Item().AlignRight().Text($"Branch: {data.Header.BranchName}")
+                                    .FontSize(8).FontColor(Colors.Blue.Lighten3);
+                                c.Item().AlignRight().Text($"Generated: {DateTimeOffset.UtcNow:dd MMM yyyy}")
+                                    .FontSize(8).FontColor(Colors.Blue.Lighten3);
+                            });
+                        });
+
+                    // Info strip beneath title bar
+                    col.Item()
+                        .Background(Colors.Blue.Lighten5)
+                        .BorderBottom(2).BorderColor(Colors.Blue.Darken2)
+                        .PaddingHorizontal(12).PaddingVertical(7)
+                        .Row(row =>
+                        {
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text(t => { t.Span("Plate:  ").SemiBold(); t.Span(data.Header.Plate); });
+                                c.Item().Text(t => { t.Span("Customer:  ").SemiBold(); t.Span(data.Header.CustomerName); });
+                            });
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text(t => { t.Span("Entry:  ").SemiBold(); t.Span(data.Header.EntryAt.ToString("dd MMM yyyy")); });
+                                c.Item().Text(t => { t.Span("Days in Shop:  ").SemiBold(); t.Span(data.Header.DaysInShop.ToString()); });
+                            });
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text(t => { t.Span("Parts Requested:  ").SemiBold(); t.Span(data.TotalPartRequests.ToString()); });
+                                c.Item().Text(t => { t.Span("Parts Used:  ").SemiBold(); t.Span(data.TotalPartsUsed.ToString()); });
+                            });
+                        });
                 });
 
-                page.Content().PaddingTop(10).Column(col =>
+                // ── CONTENT ────────────────────────────────────────────────
+                page.Content().PaddingTop(12).Column(col =>
                 {
-                    col.Item().Text("Diagnosis").Bold();
-                    col.Item().Text(data.Diagnosis ?? "-");
-                    col.Item().Text($"Latest Summary: {data.LatestDiagnosisSummary ?? "-"}");
-                    col.Item().Text($"Requested ETA: {data.RequestedEta?.ToString("g") ?? "-"} | Latest ETA: {data.LatestEstimatedEta?.ToString("g") ?? "-"}");
-                    col.Item().Text($"Current Garage: {data.CurrentGarage ?? "-"}");
-                    col.Item().Text($"Part Requests: {data.TotalPartRequests} | Parts Used: {data.TotalPartsUsed}");
+                    col.Spacing(14);
 
-                    col.Item().PaddingTop(10).Text("Job Task Checklist").FontSize(14).SemiBold();
-                    col.Item().Table(table =>
+                    // ── DIAGNOSIS OVERVIEW ──────────────────────────────────
+                    col.Item().Column(inner =>
                     {
-                        table.ColumnsDefinition(columns =>
-                        {
-                            columns.ConstantColumn(24);
-                            columns.RelativeColumn();
-                            columns.ConstantColumn(110);
-                            columns.ConstantColumn(150);
-                        });
+                        inner.Item()
+                            .BorderLeft(4).BorderColor(Colors.Blue.Darken3)
+                            .PaddingLeft(8).PaddingVertical(2)
+                            .Text("DIAGNOSIS OVERVIEW")
+                            .FontSize(10).Bold().FontColor(Colors.Blue.Darken3);
 
-                        table.Header(header =>
-                        {
-                            header.Cell().Element(CellStyle).Text("Done");
-                            header.Cell().Element(CellStyle).Text("Task");
-                            header.Cell().Element(CellStyle).Text("Status");
-                            header.Cell().Element(CellStyle).Text("Completed At");
-                        });
-
-                        foreach (var task in data.Tasks)
-                        {
-                            var isDone = string.Equals(task.DisplayStatus, "Completed", StringComparison.OrdinalIgnoreCase);
-                            table.Cell().Element(CellStyle).AlignCenter().Text(isDone ? "☑" : "☐");
-                            table.Cell().Element(CellStyle).Text(task.Title);
-                            table.Cell().Element(CellStyle).Text(task.DisplayStatus);
-                            table.Cell().Element(CellStyle).Text(task.CompletedAt?.ToString("g") ?? "-");
-                        }
+                        inner.Item()
+                            .Border(1).BorderColor(Colors.Grey.Lighten2)
+                            .Background(Colors.Grey.Lighten5)
+                            .Padding(10)
+                            .Column(info =>
+                            {
+                                info.Spacing(4);
+                                info.Item().Text(t =>
+                                {
+                                    t.Span("Initial Diagnosis:  ").SemiBold();
+                                    t.Span(data.Diagnosis ?? "-");
+                                });
+                                info.Item().Text(t =>
+                                {
+                                    t.Span("Latest Summary:  ").SemiBold();
+                                    t.Span(data.LatestDiagnosisSummary ?? "-");
+                                });
+                                info.Item().Row(r =>
+                                {
+                                    r.RelativeItem().Text(t => { t.Span("Requested ETA:  ").SemiBold(); t.Span(data.RequestedEta?.ToString("dd MMM yyyy HH:mm") ?? "-"); });
+                                    r.RelativeItem().Text(t => { t.Span("Latest ETA:  ").SemiBold(); t.Span(data.LatestEstimatedEta?.ToString("dd MMM yyyy HH:mm") ?? "-"); });
+                                    r.RelativeItem().Text(t => { t.Span("Current Garage:  ").SemiBold(); t.Span(data.CurrentGarage ?? "-"); });
+                                });
+                            });
                     });
 
-                    if (data.TaskWorkerTimes.Any())
+                    // ── JOB TASK CHECKLIST ──────────────────────────────────
+                    col.Item().Column(inner =>
                     {
-                        col.Item().PaddingTop(10).Text("Worker Time Spent Per Task").FontSize(14).SemiBold();
-                        col.Item().Table(table =>
+                        inner.Item()
+                            .BorderLeft(4).BorderColor(Colors.Blue.Darken3)
+                            .PaddingLeft(8).PaddingVertical(2)
+                            .Text("JOB TASK CHECKLIST")
+                            .FontSize(10).Bold().FontColor(Colors.Blue.Darken3);
+
+                        inner.Item().Table(table =>
                         {
                             table.ColumnsDefinition(columns =>
                             {
-                                columns.RelativeColumn();
-                                columns.RelativeColumn();
-                                columns.ConstantColumn(120);
-                                columns.ConstantColumn(90);
+                                columns.ConstantColumn(22);
+                                columns.RelativeColumn(5);
+                                columns.ConstantColumn(80);
+                                columns.ConstantColumn(125);
                             });
 
                             table.Header(header =>
                             {
-                                header.Cell().Element(CellStyle).Text("Task");
-                                header.Cell().Element(CellStyle).Text("Worker");
-                                header.Cell().Element(CellStyle).Text("Minutes");
-                                header.Cell().Element(CellStyle).Text("Hours");
+                                header.Cell().Element(FrTaskHeader).AlignCenter().Text("#");
+                                header.Cell().Element(FrTaskHeader).Text("Task");
+                                header.Cell().Element(FrTaskHeader).AlignCenter().Text("Status");
+                                header.Cell().Element(FrTaskHeader).Text("Completed At");
                             });
 
-                            foreach (var wt in data.TaskWorkerTimes)
+                            var ri = 0;
+                            foreach (var task in data.Tasks)
                             {
-                                table.Cell().Element(CellStyle).Text(wt.TaskTitle);
-                                table.Cell().Element(CellStyle).Text(wt.WorkerEmail);
-                                table.Cell().Element(CellStyle).Text(wt.TotalMinutes.ToString());
-                                table.Cell().Element(CellStyle).Text(wt.TotalHours.ToString("N2"));
+                                var isDone = string.Equals(task.DisplayStatus, "Completed", StringComparison.OrdinalIgnoreCase);
+                                var isInProgress = string.Equals(task.DisplayStatus, "InProgress", StringComparison.OrdinalIgnoreCase);
+                                var bg = ri++ % 2 == 0 ? Colors.White : Colors.Grey.Lighten4;
+
+                                table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignCenter()
+                                    .Text(isDone ? "☑" : "☐")
+                                    .FontColor(isDone ? Colors.Green.Darken2 : Colors.Grey.Medium);
+                                table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4)
+                                    .Text(task.Title);
+                                table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignCenter()
+                                    .Text(task.DisplayStatus)
+                                    .FontColor(isDone ? Colors.Green.Darken2 : isInProgress ? Colors.Blue.Darken1 : Colors.Grey.Darken1)
+                                    .SemiBold();
+                                table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4)
+                                    .Text(task.CompletedAt?.ToString("dd MMM yyyy HH:mm") ?? "-")
+                                    .FontColor(Colors.Grey.Darken2);
                             }
+                        });
+                    });
+
+                    // ── TIME LOG SUMMARY ────────────────────────────────────
+                    if (data.TimeLogs.Any())
+                    {
+                        col.Item().Column(inner =>
+                        {
+                            inner.Item()
+                                .BorderLeft(4).BorderColor(Colors.Teal.Darken2)
+                                .PaddingLeft(8).PaddingVertical(2)
+                                .Text("TIME LOG SUMMARY")
+                                .FontSize(10).Bold().FontColor(Colors.Teal.Darken2);
+
+                            inner.Item().Table(table =>
+                            {
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(2);
+                                    columns.RelativeColumn(3);
+                                    columns.RelativeColumn(3);
+                                    columns.ConstantColumn(90);
+                                    columns.ConstantColumn(90);
+                                    columns.ConstantColumn(45);
+                                });
+
+                                table.Header(header =>
+                                {
+                                    header.Cell().Element(FrTimeHeader).Text("Technician");
+                                    header.Cell().Element(FrTimeHeader).Text("Email");
+                                    header.Cell().Element(FrTimeHeader).Text("Task");
+                                    header.Cell().Element(FrTimeHeader).AlignCenter().Text("Start");
+                                    header.Cell().Element(FrTimeHeader).AlignCenter().Text("End");
+                                    header.Cell().Element(FrTimeHeader).AlignCenter().Text("Min");
+                                });
+
+                                var ri = 0;
+                                foreach (var tl in data.TimeLogs)
+                                {
+                                    var bg = ri++ % 2 == 0 ? Colors.White : Colors.Grey.Lighten4;
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4)
+                                        .Text(tl.UserName).SemiBold();
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4)
+                                        .Text(tl.UserEmail).FontColor(Colors.Grey.Darken2);
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4)
+                                        .Text(tl.TaskTitle ?? "-");
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignCenter()
+                                        .Text(tl.StartedAt.ToString("dd/MM HH:mm")).FontColor(Colors.Grey.Darken2);
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignCenter()
+                                        .Text(tl.EndedAt?.ToString("dd/MM HH:mm") ?? "Active")
+                                        .FontColor(tl.EndedAt.HasValue ? Colors.Grey.Darken2 : Colors.Green.Darken2)
+                                        .SemiBold();
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignCenter()
+                                        .Text(tl.DurationMinutes.ToString());
+                                }
+                            });
+                        });
+                    }
+
+                    // ── DIAGNOSIS HISTORY ───────────────────────────────────
+                    if (data.DiagnosisLogs.Any())
+                    {
+                        col.Item().Column(inner =>
+                        {
+                            inner.Item()
+                                .BorderLeft(4).BorderColor(Colors.Orange.Darken3)
+                                .PaddingLeft(8).PaddingVertical(2)
+                                .Text("DIAGNOSIS HISTORY")
+                                .FontSize(10).Bold().FontColor(Colors.Orange.Darken3);
+
+                            inner.Item().Table(table =>
+                            {
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(4);
+                                    columns.RelativeColumn(2);
+                                    columns.ConstantColumn(95);
+                                    columns.ConstantColumn(65);
+                                    columns.ConstantColumn(100);
+                                });
+
+                                table.Header(header =>
+                                {
+                                    header.Cell().Element(FrDiagHeader).Text("Diagnosis Note");
+                                    header.Cell().Element(FrDiagHeader).Text("Diagnosed By");
+                                    header.Cell().Element(FrDiagHeader).AlignCenter().Text("Est. ETA");
+                                    header.Cell().Element(FrDiagHeader).AlignRight().Text("Est. Price");
+                                    header.Cell().Element(FrDiagHeader).AlignCenter().Text("Date");
+                                });
+
+                                var ri = 0;
+                                foreach (var dl in data.DiagnosisLogs)
+                                {
+                                    var bg = ri++ % 2 == 0 ? Colors.White : Colors.Grey.Lighten4;
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4)
+                                        .Text(dl.DiagnosisNote);
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4)
+                                        .Text(dl.CreatedByName).SemiBold();
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignCenter()
+                                        .Text(dl.EstimatedEta?.ToString("dd MMM yyyy") ?? "-").FontColor(Colors.Grey.Darken2);
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignRight()
+                                        .Text(dl.EstimatedPrice.HasValue ? dl.EstimatedPrice.Value.ToString("N2") : "-")
+                                        .FontColor(Colors.Grey.Darken2);
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignCenter()
+                                        .Text(dl.CreatedAt.ToString("dd MMM yyyy")).FontColor(Colors.Grey.Darken2);
+                                }
+                            });
+                        });
+                    }
+
+                    // ── PARTS REQUESTS ──────────────────────────────────────
+                    if (data.PartRequests.Any())
+                    {
+                        col.Item().Column(inner =>
+                        {
+                            inner.Item()
+                                .BorderLeft(4).BorderColor(Colors.Green.Darken3)
+                                .PaddingLeft(8).PaddingVertical(2)
+                                .Text("PARTS REQUESTS")
+                                .FontSize(10).Bold().FontColor(Colors.Green.Darken3);
+
+                            inner.Item().Table(table =>
+                            {
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.ConstantColumn(58);
+                                    columns.RelativeColumn(3);
+                                    columns.ConstantColumn(35);
+                                    columns.RelativeColumn(2);
+                                    columns.ConstantColumn(78);
+                                    columns.ConstantColumn(95);
+                                });
+
+                                table.Header(header =>
+                                {
+                                    header.Cell().Element(FrPartsHeader).Text("SKU");
+                                    header.Cell().Element(FrPartsHeader).Text("Part Name");
+                                    header.Cell().Element(FrPartsHeader).AlignCenter().Text("Qty");
+                                    header.Cell().Element(FrPartsHeader).Text("Requested By");
+                                    header.Cell().Element(FrPartsHeader).AlignCenter().Text("Status");
+                                    header.Cell().Element(FrPartsHeader).AlignCenter().Text("Requested At");
+                                });
+
+                                var ri = 0;
+                                foreach (var pr in data.PartRequests)
+                                {
+                                    var isApproved = pr.Status is "Ordered" or "Arrived" or "IssuedToJob";
+                                    var isCancelled = pr.Status == "Cancelled";
+                                    var statusColor = isApproved ? Colors.Green.Darken2 : isCancelled ? Colors.Red.Darken2 : Colors.Orange.Darken2;
+                                    var bg = ri++ % 2 == 0 ? Colors.White : Colors.Grey.Lighten4;
+
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4)
+                                        .Text(pr.PartSku).FontColor(Colors.Grey.Darken2);
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4)
+                                        .Text(pr.PartName);
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignCenter()
+                                        .Text(pr.QuantityRequested.ToString("N0"));
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4)
+                                        .Text(pr.RequestedByName).SemiBold();
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignCenter()
+                                        .Text(pr.Status).FontColor(statusColor).SemiBold();
+                                    table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(4).AlignCenter()
+                                        .Text(pr.RequestedAt.ToString("dd MMM yyyy")).FontColor(Colors.Grey.Darken2);
+                                }
+                            });
                         });
                     }
                 });
+
+                // ── FOOTER ─────────────────────────────────────────────────
+                page.Footer()
+                    .BorderTop(1).BorderColor(Colors.Grey.Lighten2)
+                    .PaddingTop(4)
+                    .Row(row =>
+                    {
+                        row.RelativeItem()
+                            .Text($"Job Card: {data.Header.JobCardNo}  |  {data.Header.BranchName}  |  {data.Header.Plate}")
+                            .FontSize(8).FontColor(Colors.Grey.Medium);
+                        row.ConstantItem(80).AlignRight().Text(x =>
+                        {
+                            x.Span("Page ").FontSize(8).FontColor(Colors.Grey.Medium);
+                            x.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Medium);
+                            x.Span(" / ").FontSize(8).FontColor(Colors.Grey.Medium);
+                            x.TotalPages().FontSize(8).FontColor(Colors.Grey.Medium);
+                        });
+                    });
             });
         });
 
@@ -381,150 +630,367 @@ public sealed class PrintService : IPrintService
         bool requireToken = _config.GetValue<bool>("PublicReceipt:RequireToken", false);
         string payload = jobCardId.ToString();
         if (requireToken && !string.IsNullOrEmpty(token))
-        {
             payload = $"{jobCardId}|{token}";
-        }
 
         var baseUrl = _config["App:BaseUrl"] ?? "http://dashboard.motoritaller.es";
         var publicUrl = $"{baseUrl}/r/jobcards/{jobCardId}" + (string.IsNullOrEmpty(token) ? "" : $"?t={token}");
+
+        var invoiceRef = jobCardId.ToString().Substring(0, 8).ToUpper();
 
         var document = Document.Create(container =>
         {
             container.Page(page =>
             {
-                page.Margin(1.5f, Unit.Centimetre);
+                page.Size(PageSizes.A4);
+                page.Margin(1.4f, Unit.Centimetre);
                 page.PageColor(Colors.White);
-                page.DefaultTextStyle(x => x.FontSize(10));
+                page.DefaultTextStyle(x => x.FontSize(9));
 
-                page.Header().Row(row =>
+                // ── HEADER ─────────────────────────────────────────────────
+                page.Header().Column(hcol =>
                 {
-                    row.RelativeItem().Column(col =>
-                    {
-                        col.Item().Text(data.BranchName).FontSize(24).SemiBold().FontColor(Colors.Blue.Medium);
-                        col.Item().Text(T("Factura / Service Invoice", "Factura / Resumen de servicio")).FontSize(14).Italic();
-                    });
+                    // Top brand bar
+                    hcol.Item()
+                        .Background(Colors.Grey.Darken4)
+                        .Padding(12)
+                        .Row(row =>
+                        {
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text(data.BranchName)
+                                    .FontSize(20).Bold().FontColor(Colors.White);
+                                if (!string.IsNullOrWhiteSpace(data.BranchAddress))
+                                    c.Item().Text(data.BranchAddress)
+                                        .FontSize(8).FontColor(Colors.Grey.Lighten3);
+                            });
 
-                    var logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "logo.png");
-                    if (File.Exists(logoPath))
-                    {
-                        row.ConstantItem(100).Image(logoPath).FitArea();
-                    }
-                    else
-                    {
-                        // Fallback to dummy if logo is missing in some environments
-                        row.ConstantItem(60).Height(60).Background(Colors.Grey.Lighten3).AlignCenter().AlignMiddle().Text("LOGO").FontSize(12).FontColor(Colors.Grey.Medium);
-                    }
+                            row.ConstantItem(160).Column(c =>
+                            {
+                                c.Item().AlignRight()
+                                    .Text(T("SERVICE INVOICE", "FACTURA DE SERVICIO"))
+                                    .FontSize(13).Bold().FontColor(Colors.White);
+                                c.Item().AlignRight()
+                                    .Text($"Ref: {invoiceRef}")
+                                    .FontSize(9).FontColor(Colors.Grey.Lighten3);
+                                c.Item().AlignRight()
+                                    .Text($"{T("Date", "Fecha")}: {DateTimeOffset.UtcNow:dd MMM yyyy}")
+                                    .FontSize(8).FontColor(Colors.Grey.Lighten3);
+                                c.Item().AlignRight()
+                                    .Text($"{T("Status", "Estado")}: {data.Status}")
+                                    .FontSize(8).FontColor(Colors.Amber.Lighten2).SemiBold();
+                            });
+                        });
+
+                    // Accent line
+                    hcol.Item().Height(4).Background(Colors.Amber.Darken1);
                 });
 
-                page.Content().PaddingVertical(15).Column(col =>
+                // ── CONTENT ────────────────────────────────────────────────
+                page.Content().PaddingTop(14).Column(col =>
                 {
-                    // Basic Information
-                    col.Item().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingBottom(10).Row(row =>
+                    col.Spacing(12);
+
+                    // ── PARTIES ROW: Seller | Customer ─────────────────────
+                    col.Item().Row(row =>
                     {
-                        row.RelativeItem().Column(c =>
+                        // Seller / Workshop
+                        row.RelativeItem().Border(1).BorderColor(Colors.Grey.Lighten2).Column(c =>
                         {
-                            c.Item().Text(t => { t.Span($"{T("Plate", "Matrícula")}: ").Bold(); t.Span(data.Plate); });
-                            c.Item().Text(t => { t.Span($"{T("Customer", "Cliente")}: ").Bold(); t.Span(data.CustomerName); });
-                            c.Item().Text(t => { t.Span($"{T("Driver", "Conductor")}: ").Bold(); t.Span(string.IsNullOrWhiteSpace(data.DriverName) ? "N/A" : data.DriverName); });
-                            c.Item().Text(t => { t.Span($"{T("Status", "Estado")}: ").Bold(); t.Span(data.Status); });
+                            c.Item()
+                                .Background(Colors.Grey.Darken3)
+                                .PaddingHorizontal(8).PaddingVertical(5)
+                                .Text(T("FROM — WORKSHOP", "DE — TALLER"))
+                                .FontSize(8).Bold().FontColor(Colors.White);
+                            c.Item().PaddingHorizontal(8).PaddingVertical(8).Column(info =>
+                            {
+                                info.Spacing(3);
+                                info.Item().Text(data.BranchName).FontSize(10).Bold();
+                                if (!string.IsNullOrWhiteSpace(data.BranchAddress))
+                                    info.Item().Text(data.BranchAddress).FontColor(Colors.Grey.Darken2);
+                            });
                         });
-                        row.RelativeItem().AlignRight().Column(c =>
+
+                        row.ConstantItem(12);
+
+                        // Customer / Vehicle Owner
+                        row.RelativeItem().Border(1).BorderColor(Colors.Grey.Lighten2).Column(c =>
                         {
-                            c.Item().Text(t => { t.Span($"{T("Entry", "Entrada")}: ").Bold(); t.Span(data.EntryAt.ToString("g")); });
-                            if (data.ExitAt.HasValue)
-                                c.Item().Text(t => { t.Span($"{T("Exit", "Salida")}: ").Bold(); t.Span(data.ExitAt.Value.ToString("g")); });
+                            c.Item()
+                                .Background(Colors.Grey.Darken3)
+                                .PaddingHorizontal(8).PaddingVertical(5)
+                                .Text(T("TO — VEHICLE OWNER", "PARA — PROPIETARIO"))
+                                .FontSize(8).Bold().FontColor(Colors.White);
+                            c.Item().PaddingHorizontal(8).PaddingVertical(8).Column(info =>
+                            {
+                                info.Spacing(3);
+                                info.Item().Text(data.CustomerName).FontSize(10).Bold();
+                                if (!string.IsNullOrWhiteSpace(data.CustomerPhone))
+                                    info.Item().Text(t => { t.Span($"{T("Phone", "Teléfono")}: ").SemiBold(); t.Span(data.CustomerPhone!); });
+                                if (!string.IsNullOrWhiteSpace(data.CustomerEmail))
+                                    info.Item().Text(t => { t.Span("Email: ").SemiBold(); t.Span(data.CustomerEmail!); });
+                                if (!string.IsNullOrWhiteSpace(data.CustomerNationalId))
+                                    info.Item().Text(t => { t.Span($"{T("ID", "DNI/NIF")}: ").SemiBold(); t.Span(data.CustomerNationalId!); });
+                                info.Item().Text(t => { t.Span($"{T("Type", "Tipo")}: ").SemiBold(); t.Span(data.CustomerType); });
+                            });
                         });
                     });
 
-                    // Items if available
+                    // ── VEHICLE & JOB INFO ──────────────────────────────────
+                    col.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Column(c =>
+                    {
+                        c.Item()
+                            .Background(Colors.Amber.Darken1)
+                            .PaddingHorizontal(8).PaddingVertical(5)
+                            .Text(T("VEHICLE & JOB DETAILS", "VEHÍCULO Y DETALLES DEL TRABAJO"))
+                            .FontSize(8).Bold().FontColor(Colors.White);
+
+                        c.Item().PaddingHorizontal(8).PaddingVertical(8).Row(vrow =>
+                        {
+                            // Left: vehicle
+                            vrow.RelativeItem().Column(vc =>
+                            {
+                                vc.Spacing(3);
+                                vc.Item().Text(t => { t.Span($"{T("Plate", "Matrícula")}: ").SemiBold(); t.Span(data.Plate).FontSize(11).Bold(); });
+                                if (!string.IsNullOrWhiteSpace(data.VehicleMake))
+                                    vc.Item().Text(t => { t.Span($"{T("Make", "Marca")}: ").SemiBold(); t.Span(data.VehicleMake!); });
+                                if (!string.IsNullOrWhiteSpace(data.VehicleModel))
+                                    vc.Item().Text(t => { t.Span($"{T("Model", "Modelo")}: ").SemiBold(); t.Span(data.VehicleModel!); });
+                                if (data.VehicleYear.HasValue)
+                                    vc.Item().Text(t => { t.Span($"{T("Year", "Año")}: ").SemiBold(); t.Span(data.VehicleYear.Value.ToString()); });
+                                if (data.Mileage.HasValue)
+                                    vc.Item().Text(t => { t.Span($"{T("Mileage", "Kilometraje")}: ").SemiBold(); t.Span($"{data.Mileage.Value:N0} km"); });
+                            });
+
+                            // Middle: job dates
+                            vrow.RelativeItem().Column(jc =>
+                            {
+                                jc.Spacing(3);
+                                jc.Item().Text(t => { t.Span($"{T("Entry", "Entrada")}: ").SemiBold(); t.Span(data.EntryAt.ToString("dd MMM yyyy HH:mm")); });
+                                if (data.ExitAt.HasValue)
+                                    jc.Item().Text(t => { t.Span($"{T("Exit", "Salida")}: ").SemiBold(); t.Span(data.ExitAt.Value.ToString("dd MMM yyyy HH:mm")); });
+                                if (data.RequestedEta.HasValue)
+                                    jc.Item().Text(t => { t.Span($"{T("Req. ETA", "ETA Solicitada")}: ").SemiBold(); t.Span(data.RequestedEta.Value.ToString("dd MMM yyyy")); });
+                                if (data.LatestEstimatedEta.HasValue)
+                                    jc.Item().Text(t => { t.Span($"{T("Est. ETA", "ETA Estimada")}: ").SemiBold(); t.Span(data.LatestEstimatedEta.Value.ToString("dd MMM yyyy")); });
+                            });
+
+                            // Right: driver
+                            vrow.RelativeItem().Column(dc =>
+                            {
+                                dc.Spacing(3);
+                                if (!string.IsNullOrWhiteSpace(data.DriverName))
+                                {
+                                    dc.Item().Text($"{T("Driver", "Conductor")}").SemiBold().FontSize(8);
+                                    dc.Item().Text(data.DriverName!).Bold();
+                                    if (!string.IsNullOrWhiteSpace(data.DriverPhone))
+                                        dc.Item().Text(t => { t.Span($"{T("Phone", "Teléfono")}: ").SemiBold(); t.Span(data.DriverPhone!); });
+                                    if (!string.IsNullOrWhiteSpace(data.DriverLicenseNumber))
+                                        dc.Item().Text(t => { t.Span($"{T("License", "Licencia")}: ").SemiBold(); t.Span(data.DriverLicenseNumber!); });
+                                }
+                            });
+                        });
+
+                        if (!string.IsNullOrWhiteSpace(data.InitialReport))
+                        {
+                            c.Item()
+                                .BorderTop(1).BorderColor(Colors.Grey.Lighten3)
+                                .Background(Colors.Grey.Lighten5)
+                                .PaddingHorizontal(8).PaddingVertical(6)
+                                .Text(t =>
+                                {
+                                    t.Span($"{T("Initial Report", "Informe inicial")}: ").SemiBold();
+                                    t.Span(data.InitialReport!).FontColor(Colors.Grey.Darken2);
+                                });
+                        }
+                    });
+
+                    // ── LINE ITEMS ──────────────────────────────────────────
                     if (data.Invoice.HasInvoice && data.Invoice.Lines.Any())
                     {
-                        col.Item().PaddingTop(15).Text(T("Factura Line Items", "Líneas de factura")).FontSize(14).SemiBold();
-                        col.Item().Table(table =>
+                        col.Item().Column(inner =>
                         {
-                            table.ColumnsDefinition(columns =>
-                            {
-                                columns.RelativeColumn();
-                                columns.ConstantColumn(60);
-                                columns.ConstantColumn(80);
-                                columns.ConstantColumn(80);
-                            });
+                            inner.Item()
+                                .BorderLeft(4).BorderColor(Colors.Grey.Darken3)
+                                .PaddingLeft(8).PaddingVertical(2)
+                                .Text(T("SERVICE ITEMS", "LÍNEAS DE SERVICIO"))
+                                .FontSize(10).Bold().FontColor(Colors.Grey.Darken3);
 
-                            table.Header(header =>
+                            inner.Item().Table(table =>
                             {
-                                header.Cell().Element(CellStyle).Text(T("Description", "Descripción"));
-                                header.Cell().Element(CellStyle).AlignRight().Text(T("Qty", "Cant."));
-                                header.Cell().Element(CellStyle).AlignRight().Text(T("Unit Price", "Precio unit."));
-                                header.Cell().Element(CellStyle).AlignRight().Text(T("Amount", "Importe"));
-                            });
+                                table.ColumnsDefinition(columns =>
+                                {
+                                    columns.RelativeColumn(5);
+                                    columns.ConstantColumn(50);
+                                    columns.ConstantColumn(75);
+                                    columns.ConstantColumn(75);
+                                });
 
-                            foreach (var line in data.Invoice.Lines)
-                            {
-                                table.Cell().Element(CellStyle).Text(line.Name);
-                                table.Cell().Element(CellStyle).AlignRight().Text(line.Qty.ToString("N2"));
-                                table.Cell().Element(CellStyle).AlignRight().Text(line.UnitPrice.ToString("N2"));
-                                table.Cell().Element(CellStyle).AlignRight().Text(line.Amount.ToString("N2"));
-                            }
+                                table.Header(header =>
+                                {
+                                    header.Cell().Element(FacturaHeader).Text(T("Description", "Descripción"));
+                                    header.Cell().Element(FacturaHeader).AlignCenter().Text(T("Qty", "Cant."));
+                                    header.Cell().Element(FacturaHeader).AlignRight().Text(T("Unit Price", "P. Unit."));
+                                    header.Cell().Element(FacturaHeader).AlignRight().Text(T("Amount", "Importe"));
+                                });
+
+                                var ri = 0;
+                                foreach (var line in data.Invoice.Lines)
+                                {
+                                    var bg = ri++ % 2 == 0 ? Colors.White : Colors.Grey.Lighten4;
+                                    table.Cell().Background(bg).PaddingVertical(6).PaddingHorizontal(6).Text(line.Name);
+                                    table.Cell().Background(bg).PaddingVertical(6).PaddingHorizontal(6).AlignCenter().Text(line.Qty.ToString("N2"));
+                                    table.Cell().Background(bg).PaddingVertical(6).PaddingHorizontal(6).AlignRight().Text(line.UnitPrice.ToString("N2"));
+                                    table.Cell().Background(bg).PaddingVertical(6).PaddingHorizontal(6).AlignRight().Text(line.Amount.ToString("N2")).SemiBold();
+                                }
+                            });
                         });
                     }
 
-                    // Financial Summary
-                    col.Item().PaddingTop(15).Row(row =>
+                    // ── PAYMENTS + TOTALS ───────────────────────────────────
+                    col.Item().Row(row =>
                     {
-                        row.RelativeItem().PaddingTop(10).Column(c =>
+                        // Payment history
+                        row.RelativeItem().Column(pcol =>
                         {
-                            c.Item().Text(T("Disclaimer", "Descargo de responsabilidad")).FontSize(12).SemiBold();
-                            c.Item().Text(T(
-                                "This is an electronically generated summary. Final invoice may vary based on actual work performed. All work carried out by MotoriTaller is subject to our standard terms and conditions.",
-                                "Este es un resumen generado electrónicamente. La factura final puede variar según el trabajo realizado. Todo el trabajo realizado por MotoriTaller está sujeto a nuestros términos y condiciones estándar.")).FontSize(8).FontColor(Colors.Grey.Medium);
+                            if (data.Payments.Any())
+                            {
+                                pcol.Item()
+                                    .BorderLeft(4).BorderColor(Colors.Green.Darken2)
+                                    .PaddingLeft(8).PaddingVertical(2)
+                                    .Text(T("PAYMENTS RECEIVED", "PAGOS RECIBIDOS"))
+                                    .FontSize(9).Bold().FontColor(Colors.Green.Darken2);
 
-                            c.Item().PaddingTop(10).Text(T("Legal Content", "Contenido legal")).FontSize(12).SemiBold();
-                            c.Item().Text(T(
-                                "MotoriTaller is a registered trademark. Any unauthorized reproduction of this document is prohibited. Please keep this receipt for your records and warranty purposes.",
-                                "MotoriTaller es una marca registrada. Cualquier reproducción no autorizada de este documento está prohibida. Conserve este recibo para sus registros y fines de garantía.")).FontSize(8).FontColor(Colors.Grey.Medium);
+                                pcol.Item().Table(table =>
+                                {
+                                    table.ColumnsDefinition(columns =>
+                                    {
+                                        columns.RelativeColumn(2);
+                                        columns.RelativeColumn(2);
+                                        columns.RelativeColumn(1);
+                                    });
+
+                                    table.Header(header =>
+                                    {
+                                        header.Cell().Element(PaymentHeader).Text(T("Date", "Fecha"));
+                                        header.Cell().Element(PaymentHeader).Text(T("Method", "Método"));
+                                        header.Cell().Element(PaymentHeader).AlignRight().Text(T("Amount", "Importe"));
+                                    });
+
+                                    var ri = 0;
+                                    foreach (var p in data.Payments)
+                                    {
+                                        var bg = ri++ % 2 == 0 ? Colors.White : Colors.Grey.Lighten4;
+                                        table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(5).Text(p.PaidAt.ToString("dd MMM yyyy")).FontColor(Colors.Grey.Darken2);
+                                        table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(5).Text(p.Method);
+                                        table.Cell().Background(bg).PaddingVertical(5).PaddingHorizontal(5).AlignRight().Text(p.Amount.ToString("N2")).FontColor(Colors.Green.Darken2).SemiBold();
+                                    }
+                                });
+                            }
                         });
 
-                        row.RelativeItem().AlignRight().Column(fcol =>
-                        {
-                            fcol.Item().Text(T("Financial Summary", "Resumen financiero")).FontSize(14).SemiBold();
-                            fcol.Item().Text($"{T("Subtotal", "Subtotal")}: {data.Invoice.Subtotal:N2}");
-                            if (data.Invoice.Discount > 0)
-                                fcol.Item().Text($"{T("Discount", "Descuento")} ({data.Invoice.Discount}%): -{data.Invoice.DiscountAmount:N2}").FontColor(Colors.Red.Medium);
-                            if (data.Invoice.Tax > 0)
-                                fcol.Item().Text($"{T("Tax", "Impuesto")} ({data.Invoice.Tax}%): {data.Invoice.TaxAmount:N2}");
+                        row.ConstantItem(16);
 
-                            fcol.Item().BorderTop(1).PaddingTop(5).Text($"{T("Total", "Total")}: {data.Invoice.Total:N2}").FontSize(14).Bold();
-                            fcol.Item().Text($"{T("Paid", "Pagado")}: {data.Invoice.Paid:N2}").FontColor(Colors.Green.Medium);
-                            fcol.Item().Text($"{T("Due", "Pendiente")}: {data.Invoice.Due:N2}").FontColor(Colors.Red.Medium).Bold();
+                        // Financial totals box
+                        row.ConstantItem(210).Column(fcol =>
+                        {
+                            fcol.Item()
+                                .Background(Colors.Grey.Darken3)
+                                .PaddingHorizontal(10).PaddingVertical(6)
+                                .Text(T("FINANCIAL SUMMARY", "RESUMEN FINANCIERO"))
+                                .FontSize(8).Bold().FontColor(Colors.White);
+
+                            fcol.Item()
+                                .Border(1).BorderColor(Colors.Grey.Lighten2)
+                                .PaddingHorizontal(10).PaddingVertical(8)
+                                .Column(fs =>
+                                {
+                                    fs.Spacing(4);
+                                    fs.Item().Row(r =>
+                                    {
+                                        r.RelativeItem().Text(T("Subtotal", "Subtotal")).FontColor(Colors.Grey.Darken2);
+                                        r.ConstantItem(70).AlignRight().Text(data.Invoice.Subtotal.ToString("N2"));
+                                    });
+                                    if (data.Invoice.Discount > 0)
+                                    {
+                                        fs.Item().Row(r =>
+                                        {
+                                            r.RelativeItem().Text($"{T("Discount", "Descuento")} ({data.Invoice.Discount}%)").FontColor(Colors.Red.Medium);
+                                            r.ConstantItem(70).AlignRight().Text($"-{data.Invoice.DiscountAmount:N2}").FontColor(Colors.Red.Medium);
+                                        });
+                                    }
+                                    if (data.Invoice.Tax > 0)
+                                    {
+                                        fs.Item().Row(r =>
+                                        {
+                                            r.RelativeItem().Text($"{T("Tax", "IVA")} ({data.Invoice.Tax}%)").FontColor(Colors.Grey.Darken2);
+                                            r.ConstantItem(70).AlignRight().Text(data.Invoice.TaxAmount.ToString("N2")).FontColor(Colors.Grey.Darken2);
+                                        });
+                                    }
+                                    fs.Item().BorderTop(1).BorderColor(Colors.Grey.Lighten2).PaddingTop(5).Row(r =>
+                                    {
+                                        r.RelativeItem().Text(T("TOTAL", "TOTAL")).Bold().FontSize(11);
+                                        r.ConstantItem(70).AlignRight().Text(data.Invoice.Total.ToString("N2")).Bold().FontSize(11);
+                                    });
+                                    fs.Item().Row(r =>
+                                    {
+                                        r.RelativeItem().Text(T("Paid", "Pagado")).FontColor(Colors.Green.Darken2).SemiBold();
+                                        r.ConstantItem(70).AlignRight().Text(data.Invoice.Paid.ToString("N2")).FontColor(Colors.Green.Darken2).SemiBold();
+                                    });
+                                    fs.Item().Row(r =>
+                                    {
+                                        r.RelativeItem().Text(T("Balance Due", "Saldo Pendiente")).FontColor(data.Invoice.Due > 0 ? Colors.Red.Medium : Colors.Grey.Darken2).Bold();
+                                        r.ConstantItem(70).AlignRight().Text(data.Invoice.Due.ToString("N2")).FontColor(data.Invoice.Due > 0 ? Colors.Red.Medium : Colors.Grey.Darken2).Bold();
+                                    });
+                                });
                         });
                     });
 
-                    // Online Access
-                    col.Item().PaddingTop(30).AlignCenter().Column(cc =>
+                    // ── DISCLAIMER + BARCODE ────────────────────────────────
+                    col.Item().Row(row =>
                     {
-                        var barcode = new Barcode(payload, NetBarcode.Type.Code128, true);
-                        cc.Item().Width(150).Image(barcode.GetByteArray());
-                        cc.Item().Text(publicUrl).FontSize(8).FontColor(Colors.Blue.Medium);
-                        cc.Item().Text(T("Scan to view full details online", "Escanea para ver todos los detalles en línea")).FontSize(8);
+                        row.RelativeItem().Column(dc =>
+                        {
+                            dc.Spacing(4);
+                            dc.Item().Text(T("Disclaimer", "Descargo de responsabilidad")).FontSize(8).SemiBold().FontColor(Colors.Grey.Darken2);
+                            dc.Item().Text(T(
+                                "This is an electronically generated summary. Final invoice may vary based on actual work performed.",
+                                "Este es un resumen generado electrónicamente. La factura final puede variar según el trabajo realizado."))
+                                .FontSize(7).FontColor(Colors.Grey.Medium);
+                            dc.Item().Text(T(
+                                "All work is subject to our standard terms and conditions. Please keep this document for your records.",
+                                "Todo el trabajo está sujeto a nuestros términos y condiciones. Conserve este documento para sus registros."))
+                                .FontSize(7).FontColor(Colors.Grey.Medium);
+                        });
+
+                        row.ConstantItem(160).AlignCenter().Column(bc =>
+                        {
+                            var barcode = new Barcode(payload, NetBarcode.Type.Code128, true);
+                            bc.Item().AlignCenter().Width(140).Image(barcode.GetByteArray());
+                            bc.Item().AlignCenter().Text(T("Scan for full details", "Escanear para detalles")).FontSize(7).FontColor(Colors.Grey.Medium);
+                        });
                     });
                 });
 
+                // ── FOOTER ─────────────────────────────────────────────────
                 page.Footer().Column(f =>
                 {
-                    f.Item().AlignCenter().PaddingBottom(5)
-                        .Text(T("Thank you for choosing MotoriTaller!", "¡Gracias por elegir MotoriTaller!"))
-                        .FontSize(10)
-                        .SemiBold()
-                        .FontColor(Colors.Blue.Medium);
-
-                    f.Item().AlignCenter().Text(x =>
-                    {
-                        x.Span(T("Page ", "Página ")).FontSize(8).FontColor(Colors.Grey.Medium);
-                        x.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Medium);
-                        x.Span(T(" - MotoriTaller - Professional Workshop Management", " - MotoriTaller - Gestión profesional de talleres"))
-                            .FontSize(8)
-                            .FontColor(Colors.Grey.Medium);
-                    });
+                    f.Item().Height(4).Background(Colors.Amber.Darken1);
+                    f.Item()
+                        .Background(Colors.Grey.Darken4)
+                        .PaddingHorizontal(14).PaddingVertical(6)
+                        .Row(frow =>
+                        {
+                            frow.RelativeItem()
+                                .Text(T("Thank you for choosing our workshop!", "¡Gracias por elegirnos!"))
+                                .FontSize(9).SemiBold().FontColor(Colors.White);
+                            frow.ConstantItem(100).AlignRight().Text(x =>
+                            {
+                                x.Span(T("Page ", "Página ")).FontSize(8).FontColor(Colors.Grey.Lighten3);
+                                x.CurrentPageNumber().FontSize(8).FontColor(Colors.Grey.Lighten3);
+                                x.Span(" / ").FontSize(8).FontColor(Colors.Grey.Lighten3);
+                                x.TotalPages().FontSize(8).FontColor(Colors.Grey.Lighten3);
+                            });
+                        });
                 });
             });
         });
@@ -536,6 +1002,30 @@ public sealed class PrintService : IPrintService
     {
         return container.BorderBottom(1).BorderColor(Colors.Grey.Lighten2).PaddingVertical(5).PaddingHorizontal(5);
     }
+
+    private static IContainer FrTaskHeader(IContainer c) =>
+        c.Background(Colors.Blue.Darken4).PaddingVertical(6).PaddingHorizontal(5)
+         .DefaultTextStyle(x => x.FontSize(8).Bold().FontColor(Colors.White));
+
+    private static IContainer FrTimeHeader(IContainer c) =>
+        c.Background(Colors.Teal.Darken2).PaddingVertical(6).PaddingHorizontal(5)
+         .DefaultTextStyle(x => x.FontSize(8).Bold().FontColor(Colors.White));
+
+    private static IContainer FrDiagHeader(IContainer c) =>
+        c.Background(Colors.Orange.Darken3).PaddingVertical(6).PaddingHorizontal(5)
+         .DefaultTextStyle(x => x.FontSize(8).Bold().FontColor(Colors.White));
+
+    private static IContainer FrPartsHeader(IContainer c) =>
+        c.Background(Colors.Green.Darken3).PaddingVertical(6).PaddingHorizontal(5)
+         .DefaultTextStyle(x => x.FontSize(8).Bold().FontColor(Colors.White));
+
+    private static IContainer FacturaHeader(IContainer c) =>
+        c.Background(Colors.Grey.Darken3).PaddingVertical(6).PaddingHorizontal(6)
+         .DefaultTextStyle(x => x.FontSize(8).Bold().FontColor(Colors.White));
+
+    private static IContainer PaymentHeader(IContainer c) =>
+        c.Background(Colors.Green.Darken3).PaddingVertical(5).PaddingHorizontal(5)
+         .DefaultTextStyle(x => x.FontSize(8).Bold().FontColor(Colors.White));
 
     private async Task<JobCardPrintResponse> GetJobCardPrintDataAsync(Guid jobCardId, Guid branchId, CancellationToken ct)
     {
@@ -577,9 +1067,11 @@ public sealed class PrintService : IPrintService
                                   join p in _db.Parts on r.PartId equals p.Id
                                   join u in _db.Users on r.CreatedBy equals u.Id into users
                                   from u in users.DefaultIfEmpty()
+                                  join ep in _db.EmployeeProfiles on u.Id equals ep.UserId into eps
+                                  from ep in eps.DefaultIfEmpty()
                                   join s in _db.Suppliers on r.SupplierId equals s.Id into suppliers
                                   from s in suppliers.DefaultIfEmpty()
-                                  select new JobCardPrintPartRequestDto(p.Sku, p.Name, r.Qty, r.Status.ToString(), u.Email, r.RequestedAt, s.Name, null))
+                                  select new JobCardPrintPartRequestDto(p.Sku, p.Name, r.Qty, r.Status.ToString(), u != null ? u.Email : "N/A", ep != null ? ep.FullName : (u != null ? u.Email : "N/A"), r.RequestedAt, s.Name, null))
                                   .ToListAsync(ct);
 
         var roadblockers = await (from rb in _db.Roadblockers.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
@@ -591,9 +1083,11 @@ public sealed class PrintService : IPrintService
 
         var timeLogs = await (from tl in _db.JobCardTimeLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
                               join u in _db.Users on tl.TechnicianUserId equals u.Id
+                              join ep in _db.EmployeeProfiles on u.Id equals ep.UserId into eps
+                              from ep in eps.DefaultIfEmpty()
                               join t in _db.JobTasks on tl.JobTaskId equals t.Id into tasks_
                               from t in tasks_.DefaultIfEmpty()
-                              select new JobCardPrintTimeLogDto(u.Email, t.Title, tl.StartAt, tl.EndAt, tl.TotalMinutes))
+                              select new JobCardPrintTimeLogDto(u.Email, ep != null ? ep.FullName : u.Email, t.Title, tl.StartAt, tl.EndAt, tl.TotalMinutes))
                               .ToListAsync(ct);
 
         var communications = await (from c in _db.CommunicationLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
@@ -604,8 +1098,10 @@ public sealed class PrintService : IPrintService
         var diagnosisLogs = await (from dl in _db.JobCardDiagnosisLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
                                    join u in _db.Users on dl.CreatedByUserId equals u.Id into users
                                    from u in users.DefaultIfEmpty()
+                                   join ep in _db.EmployeeProfiles on u.Id equals ep.UserId into eps
+                                   from ep in eps.DefaultIfEmpty()
                                    orderby dl.CreatedAt descending
-                                   select new JobCardPrintDiagnosisLogDto(dl.DiagnosisNote, dl.EstimatedEta, dl.EstimatedPrice, u != null ? u.Email : "N/A", dl.CreatedAt))
+                                   select new JobCardPrintDiagnosisLogDto(dl.DiagnosisNote, dl.EstimatedEta, dl.EstimatedPrice, u != null ? u.Email : "N/A", ep != null ? ep.FullName : (u != null ? u.Email : "N/A"), dl.CreatedAt))
                                    .ToListAsync(ct);
 
         var taskWorkerTimeRows = await (from tl in _db.JobCardTimeLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)

@@ -65,9 +65,11 @@ public sealed class PublicReportService : IPublicReportService
                                   join p in _db.Parts on r.PartId equals p.Id
                                   join u in _db.Users on r.CreatedBy equals u.Id into users
                                   from u in users.DefaultIfEmpty()
+                                  join ep in _db.EmployeeProfiles on u.Id equals ep.UserId into eps
+                                  from ep in eps.DefaultIfEmpty()
                                   join s in _db.Suppliers on r.SupplierId equals s.Id into suppliers
                                   from s in suppliers.DefaultIfEmpty()
-                                  select new JobCardPrintPartRequestDto(p.Sku, p.Name, r.Qty, r.Status.ToString(), u.Email, r.RequestedAt, s.Name, null))
+                                  select new JobCardPrintPartRequestDto(p.Sku, p.Name, r.Qty, r.Status.ToString(), u != null ? u.Email : "N/A", ep != null ? ep.FullName : (u != null ? u.Email : "N/A"), r.RequestedAt, s.Name, null))
                                   .ToListAsync(ct);
 
         var roadblockers = await (from rb in _db.Roadblockers.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
@@ -79,9 +81,11 @@ public sealed class PublicReportService : IPublicReportService
 
         var timeLogs = await (from tl in _db.JobCardTimeLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
                               join u in _db.Users on tl.TechnicianUserId equals u.Id
+                              join ep in _db.EmployeeProfiles on u.Id equals ep.UserId into eps
+                              from ep in eps.DefaultIfEmpty()
                               join t in _db.JobTasks on tl.JobTaskId equals t.Id into tasks_
                               from t in tasks_.DefaultIfEmpty()
-                              select new JobCardPrintTimeLogDto(u.Email, t.Title, tl.StartAt, tl.EndAt, tl.TotalMinutes))
+                              select new JobCardPrintTimeLogDto(u.Email, ep != null ? ep.FullName : u.Email, t.Title, tl.StartAt, tl.EndAt, tl.TotalMinutes))
                               .ToListAsync(ct);
 
         var taskWorkerTimeRows = await (from tl in _db.JobCardTimeLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
@@ -123,8 +127,10 @@ public sealed class PublicReportService : IPublicReportService
         var diagnosisLogs = await (from dl in _db.JobCardDiagnosisLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
                                    join u in _db.Users on dl.CreatedByUserId equals u.Id into users
                                    from u in users.DefaultIfEmpty()
+                                   join ep in _db.EmployeeProfiles on u.Id equals ep.UserId into eps
+                                   from ep in eps.DefaultIfEmpty()
                                    orderby dl.CreatedAt descending
-                                   select new JobCardPrintDiagnosisLogDto(dl.DiagnosisNote, dl.EstimatedEta, dl.EstimatedPrice, u != null ? u.Email : "N/A", dl.CreatedAt))
+                                   select new JobCardPrintDiagnosisLogDto(dl.DiagnosisNote, dl.EstimatedEta, dl.EstimatedPrice, u != null ? u.Email : "N/A", ep != null ? ep.FullName : (u != null ? u.Email : "N/A"), dl.CreatedAt))
                                    .ToListAsync(ct);
 
         var invoice = await _db.Invoices.FirstOrDefaultAsync(x => x.JobCardId == jobCardId && !x.IsDeleted, ct);

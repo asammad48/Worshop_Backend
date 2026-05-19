@@ -38,6 +38,7 @@ public sealed record JobCardPrintPartRequestDto(
     decimal QuantityRequested,
     string Status,
     string RequestedByEmail,
+    string RequestedByName,
     DateTimeOffset RequestedAt,
     string? SupplierName,
     string? Note);
@@ -53,6 +54,7 @@ public sealed record JobCardPrintRoadblockerDto(
 
 public sealed record JobCardPrintTimeLogDto(
     string UserEmail,
+    string UserName,
     string? TaskTitle,
     DateTimeOffset StartedAt,
     DateTimeOffset? EndedAt,
@@ -69,6 +71,7 @@ public sealed record JobCardPrintDiagnosisLogDto(
     DateTimeOffset? EstimatedEta,
     decimal? EstimatedPrice,
     string CreatedByEmail,
+    string CreatedByName,
     DateTimeOffset CreatedAt);
 
 public sealed record JobCardPrintCommunicationDto(
