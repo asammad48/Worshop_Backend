@@ -64,6 +64,13 @@ public sealed record JobCardTaskWorkerTimeDto(
     int TotalMinutes,
     decimal TotalHours);
 
+public sealed record JobCardPrintDiagnosisLogDto(
+    string DiagnosisNote,
+    DateTimeOffset? EstimatedEta,
+    decimal? EstimatedPrice,
+    string CreatedByEmail,
+    DateTimeOffset CreatedAt);
+
 public sealed record JobCardPrintCommunicationDto(
     string Type,
     string Direction,
@@ -98,4 +105,5 @@ public sealed record JobCardPrintResponse(
     IReadOnlyList<JobCardPrintRoadblockerDto> Roadblockers,
     IReadOnlyList<JobCardPrintTimeLogDto> TimeLogs,
     IReadOnlyList<JobCardPrintCommunicationDto> Communications,
-    JobCardPrintFinancialDto Financial);
+    JobCardPrintFinancialDto Financial,
+    IReadOnlyList<JobCardPrintDiagnosisLogDto> DiagnosisLogs);
