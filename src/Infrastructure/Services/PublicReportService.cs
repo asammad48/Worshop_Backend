@@ -119,6 +119,7 @@ public sealed class PublicReportService : IPublicReportService
                                     .ToListAsync(ct);
 
 
+
         var diagnosisLogs = await (from dl in _db.JobCardDiagnosisLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
                                    join u in _db.Users on dl.CreatedByUserId equals u.Id into users
                                    from u in users.DefaultIfEmpty()

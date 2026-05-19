@@ -601,6 +601,13 @@ public sealed class PrintService : IPrintService
                                     select new JobCardPrintCommunicationDto(c.Type.ToString(), c.Direction.ToString(), c.Summary, c.Details, c.OccurredAt, u.Email))
                                     .ToListAsync(ct);
 
+        var diagnosisLogs = await (from dl in _db.JobCardDiagnosisLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+                                   join u in _db.Users on dl.CreatedByUserId equals u.Id into users
+                                   from u in users.DefaultIfEmpty()
+                                   orderby dl.CreatedAt descending
+                                   select new JobCardPrintDiagnosisLogDto(dl.DiagnosisNote, dl.EstimatedEta, dl.EstimatedPrice, u != null ? u.Email : "N/A", dl.CreatedAt))
+                                   .ToListAsync(ct);
+
         var taskWorkerTimeRows = await (from tl in _db.JobCardTimeLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
                                         join u in _db.Users on tl.TechnicianUserId equals u.Id
                                         join t in _db.JobTasks on tl.JobTaskId equals t.Id into tasks_
@@ -644,6 +651,6 @@ public sealed class PrintService : IPrintService
             (invoice?.Total ?? 0) - paid
         );
 
-        return new JobCardPrintResponse(header, job.Diagnosis, job.LatestDiagnosisSummary, job.RequestedEta, job.LatestEstimatedEta, currentGarage, partRequests.Count, partsUsed.Count, tasks, taskWorkerTimes, partsUsed, partRequests, roadblockers, timeLogs, communications, financial);
+        return new JobCardPrintResponse(header, job.Diagnosis, job.LatestDiagnosisSummary, job.RequestedEta, job.LatestEstimatedEta, currentGarage, partRequests.Count, partsUsed.Count, tasks, taskWorkerTimes, partsUsed, partRequests, roadblockers, timeLogs, communications, financial, diagnosisLogs);
     }
 }
