@@ -52,7 +52,7 @@ public sealed class PublicReportService : IPublicReportService
         var tasks = await (from t in _db.JobTasks.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
                            join u in _db.Users on t.StartedByUserId equals u.Id into users
                            from u in users.DefaultIfEmpty()
-                           select new JobCardPrintTaskDto(t.Id, t.Title, t.Status.ToString(), ComputeDisplayStatus(job.EntryAt, job.ExitAt, t.Status), u.Email, t.StartedAt, t.EndedAt, t.Notes))
+                           select new JobCardPrintTaskDto(t.Id, t.Title, t.Status.ToString(), ComputeDisplayStatus(t.StartedAt, t.EndedAt, t.Status), u.Email, t.StartedAt, t.EndedAt, t.Notes))
                            .ToListAsync(ct);
 
         var partsUsed = await (from u in _db.JobCardPartUsages.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
@@ -118,6 +118,14 @@ public sealed class PublicReportService : IPublicReportService
                                     select new JobCardPrintCommunicationDto(c.Type.ToString(), c.Direction.ToString(), c.Summary, c.Details, c.OccurredAt, u.Email))
                                     .ToListAsync(ct);
 
+
+        var diagnosisLogs = await (from dl in _db.JobCardDiagnosisLogs.Where(x => x.JobCardId == jobCardId && !x.IsDeleted)
+                                   join u in _db.Users on dl.CreatedByUserId equals u.Id into users
+                                   from u in users.DefaultIfEmpty()
+                                   orderby dl.CreatedAt descending
+                                   select new JobCardPrintDiagnosisLogDto(dl.DiagnosisNote, dl.EstimatedEta, dl.EstimatedPrice, u != null ? u.Email : "N/A", dl.CreatedAt))
+                                   .ToListAsync(ct);
+
         var invoice = await _db.Invoices.FirstOrDefaultAsync(x => x.JobCardId == jobCardId && !x.IsDeleted, ct);
         decimal paid = invoice == null ? 0 : await _db.Payments.Where(x => x.InvoiceId == invoice.Id && !x.IsDeleted).SumAsync(x => x.Amount, ct);
 
@@ -132,15 +140,14 @@ public sealed class PublicReportService : IPublicReportService
             (invoice?.Total ?? 0) - paid
         );
 
-        return new JobCardPrintResponse(header, job.Diagnosis, job.LatestDiagnosisSummary, job.RequestedEta, job.LatestEstimatedEta, currentGarage, partRequests.Count, partsUsed.Count, tasks, taskWorkerTimes, partsUsed, partRequests, roadblockers, timeLogs, communications, financial);
+        return new JobCardPrintResponse(header, job.Diagnosis, job.LatestDiagnosisSummary, job.RequestedEta, job.LatestEstimatedEta, currentGarage, partRequests.Count, partsUsed.Count, tasks, taskWorkerTimes, partsUsed, partRequests, roadblockers, timeLogs, communications, financial, diagnosisLogs);
     }
 
-    private static string ComputeDisplayStatus(DateTimeOffset? entryAt, DateTimeOffset? exitAt, JobTaskStatus taskStatus)
+    private static string ComputeDisplayStatus(DateTimeOffset? startedAt, DateTimeOffset? endedAt, JobTaskStatus taskStatus)
     {
-        if (!entryAt.HasValue) return "Pending";
-        if (entryAt.HasValue && exitAt.HasValue) return "Completed";
-        if (taskStatus == JobTaskStatus.Done) return "Completed";
-        return "InProgress";
+        if (endedAt.HasValue || taskStatus == JobTaskStatus.Done) return "Completed";
+        if (startedAt.HasValue || taskStatus == JobTaskStatus.InProgress) return "InProgress";
+        return "Pending";
     }
 
     private bool ValidateToken(Guid jobCardId, string token) => GenerateToken(jobCardId) == token;
